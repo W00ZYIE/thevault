@@ -1,0 +1,17 @@
+{
+  "name": "Vault",
+  "short_name": "Vault",
+  "start_url": "/thevault/",
+  "display": "standalone",
+  "background_color": "#09090B",
+  "theme_color": "#09090B",
+  "icons": [
+    {
+      "src": "/thevault/Favicon_Test.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
+

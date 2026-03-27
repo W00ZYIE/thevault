@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VaultIQ — Know Your Runway. Command Your Capital.</title>
+<link rel="icon" type="image/svg+xml" href="TheVaultShield.png" />
+<meta name="description" content="The private financial command center for serious operators. Know your runway. Command your burn. Move with precision. 14-day free trial.">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<!-- Analytics: replace YOUR-DOMAIN with your actual domain after deploying -->
+<!-- <script defer data-domain="YOUR-DOMAIN" src="https://plausible.io/js/script.js"></script> -->
+<style>
+/* VaultIQ — Clean White Theme. Apple-feel. Built to convert. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:        #1A6FD4;
+  --blue-dark:   #1254A8;
+  --blue-light:  #EBF3FF;
+  --blue-faint:  #F4F8FF;
+  --gold:        #E8A020;
+  --gold-light:  #FFF8E6;
+  --green:       #00B876;
+  --green-light: #EDFBF4;
+  --red:         #E53935;
+  --text-1:      #0A0C10;
+  --text-2:      #3D4452;
+  --text-3:      #6B7280;
+  --text-4:      #9CA3AF;
+  --bg:          #FFFFFF;
+  --bg-subtle:   #F7F9FC;
+  --bg-card:     #FFFFFF;
+  --border:      rgba(0,0,0,0.08);
+  --border-mid:  rgba(0,0,0,0.14);
+  --shadow-xs:   0 1px 3px rgba(0,0,0,0.06);
+  --shadow-sm:   0 2px 12px rgba(0,0,0,0.07);
+  --shadow-md:   0 4px 24px rgba(0,0,0,0.09);
+  --shadow-lg:   0 8px 48px rgba(0,0,0,0.11);
+  --shadow-xl:   0 16px 64px rgba(0,0,0,0.13);
+  --radius-sm:   8px;
+  --radius:      12px;
+  --radius-lg:   20px;
+  --radius-xl:   28px;
+  /* Legacy aliases so old HTML classes still work */
+  --void: #FFFFFF; --deep: #F7F9FC; --surf: #F0F4FA; --plate: #FFFFFF; --edge: rgba(0,0,0,0.08);
+  --text-dim: #6B7280; --text-mid: #3D4452; --text-bright: #0A0C10; --text-peak: #0A0C10;
+  --steel: #1A6FD4; --steel-a1: rgba(26,111,212,0.08); --steel-a2: rgba(26,111,212,0.16);
+  --green-d: #EDFBF4; --gold-d: #FFF8E6;
+  --cold-1: rgba(0,0,0,0.04); --cold-2: rgba(0,0,0,0.08); --cold-3: rgba(0,0,0,0.14); --cold-4: rgba(0,0,0,0.22);
+  --ice: #1A6FD4; --platinum: #3D4452; --titanium: #0A0C10;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text-2);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  font-size: 16px;
+  line-height: 1.6;
+}
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 2px; }
+
+/* ── HIDDEN DARK ELEMENTS ── */
+.page-grid, .vignette, .eng-frame, .eng-border, .eng-corner, .eng-coord { display: none !important; }
+
+/* ── LAYOUT ── */
+.page { position: relative; }
+section { position: relative; }
+.container { max-width: 1120px; margin: 0 auto; padding: 0 40px; }
+
+/* ── ANNOUNCEMENT BAR ── */
+.ann-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  background: var(--blue);
+  padding: 10px 20px;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+  color: rgba(255,255,255,0.92);
+}
+.ann-dot { width: 6px; height: 6px; border-radius: 50%; background: #46e7a9; animation: pulse 2s ease-in-out infinite; flex-shrink: 0; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.ann-bar a { color: white; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 36px; left: 0; right: 0; z-index: 100;
+  padding: 14px 40px;
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  background: rgba(255,255,255,0.88); backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid transparent;
+  transition: all 0.3s;
+}
+nav.scrolled { top: 0; border-bottom-color: var(--border); box-shadow: var(--shadow-xs); background: rgba(255,255,255,0.96); }
+.nav-logo {
+  font-family: 'Inter', sans-serif;
+  font-size: 17px; font-weight: 800; letter-spacing: -0.02em;
+  color: var(--text-1); display: flex; align-items: center; gap: 8px;
+}
+.nav-logo-shield { width: 26px; height: 26px; object-fit: contain; }
+.nav-logo span { color: var(--blue); }
+.nav-links { display: flex; align-items: center; gap: 24px; list-style: none; }
+.nav-links a {
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500;
+  color: var(--text-3); text-decoration: none; transition: color 180ms;
+}
+.nav-links a:hover { color: var(--text-1); }
+.nav-cta {
+  padding: 9px 20px; background: var(--blue) !important; border-radius: var(--radius-sm);
+  color: white !important; font-family: 'Inter', sans-serif !important;
+  font-size: 14px !important; font-weight: 600 !important; letter-spacing: normal !important;
+  text-transform: none !important; text-decoration: none; transition: all 180ms !important;
+}
+.nav-cta:hover { background: var(--blue-dark) !important; box-shadow: 0 2px 12px rgba(26,111,212,0.3) !important; }
+.nav-trial-count { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; color: var(--green); }
+.nav-mobile-cta { display: none; }
+
+/* ── BUTTONS ── */
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 15px 32px; background: var(--blue); color: white;
+  font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
+  border: none; border-radius: var(--radius-sm); cursor: pointer;
+  text-decoration: none; transition: all 200ms;
+  box-shadow: 0 2px 16px rgba(26,111,212,0.28);
+  position: relative; overflow: hidden;
+}
+.btn-primary::before { display: none; }
+.btn-primary:hover { background: var(--blue-dark); transform: translateY(-1px); box-shadow: 0 4px 24px rgba(26,111,212,0.38); color: white; }
+.btn-primary-lg { padding: 17px 40px; font-size: 16px; }
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 15px 28px; background: transparent; color: var(--text-2);
+  font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 500;
+  border: 1.5px solid var(--border-mid); border-radius: var(--radius-sm);
+  cursor: pointer; text-decoration: none; transition: all 200ms;
+}
+.btn-secondary:hover { border-color: var(--blue); color: var(--blue); }
+
+/* ── HERO ── */
+#hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 120px 40px 80px;
+  background: linear-gradient(180deg, #F0F5FF 0%, #FFFFFF 65%);
+  position: relative; overflow: hidden;
+}
+#hero::before {
+  content: ''; position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+  width: 900px; height: 900px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(26,111,212,0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+.hero-inner { display: flex; flex-direction: column; align-items: center; max-width: 820px; width: 100%; position: relative; z-index: 1; padding-bottom: 0; }
+
+/* Hide old dark-theme hero decorative elements */
+.hero-kicker, .hero-wordmark, .hero-rule, .hero-scroll { display: none !important; }
+.hero-badge-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 14px; background: var(--blue-light); border-radius: 100px;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700; color: var(--blue);
+  letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 24px;
+  opacity: 0; animation: fadeUp 1s cubic-bezier(0.16,1,0.3,1) 0.12s forwards;
+}
+.hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s ease-in-out infinite; }
+
+.hero-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(34px, 5.5vw, 68px); font-weight: 800; letter-spacing: -0.04em;
+  color: var(--text-1); line-height: 1.07; margin-bottom: 20px;
+  opacity: 0; animation: fadeUp 1s cubic-bezier(0.16,1,0.3,1) 0.2s forwards;
+}
+.hero-sub em { font-style: normal; color: var(--blue); }
+
+.hero-tagline {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(16px, 2vw, 21px); font-weight: 400;
+  color: var(--text-3); line-height: 1.55; max-width: 520px; margin-bottom: 36px;
+  opacity: 0; animation: fadeUp 1s cubic-bezier(0.16,1,0.3,1) 0.3s forwards;
+}
+
+.hero-actions {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center;
+  margin-bottom: 32px;
+  opacity: 0; animation: fadeUp 1s cubic-bezier(0.16,1,0.3,1) 0.4s forwards;
+}
+
+.hero-trust {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: center;
+  opacity: 0; animation: fadeUp 1s cubic-bezier(0.16,1,0.3,1) 0.5s forwards;
+}
+.hero-trust-item { display: flex; align-items: center; gap: 6px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-3); }
+.hero-trust-check { color: var(--green); font-size: 15px; font-weight: 700; }
+.hero-trust-divider { width: 3px; height: 3px; background: rgba(0,0,0,0.18); border-radius: 50%; }
+
+@keyframes fadeUp {
+  0%   { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ── SCROLL REVEAL ── */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1), transform 0.8s cubic-bezier(0.16,1,0.3,1); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ── HERO-ANCHORED TICKER ── */
+/* Default: absolute, pinned to hero's bottom edge */
+#bottom-ticker {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 50;
+  padding: 13px 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.06);
+}
+/* When hero is visible: lock to viewport bottom */
+#bottom-ticker.is-fixed {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 300;
+}
+.ticker-track { display: flex; gap: 0; white-space: nowrap; animation: ticker 35s linear infinite; }
+.ticker-item {
+  display: inline-flex; align-items: center; gap: 8px; padding: 0 32px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-3); flex-shrink: 0;
+}
+.ticker-sep { color: var(--border-mid); }
+@keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+/* ── SECTION HEADERS ── */
+.section-header { text-align: center; margin-bottom: 52px; }
+.section-eyebrow { display: inline-block; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--blue); margin-bottom: 10px; }
+.section-title { font-family: 'Inter', sans-serif; font-size: clamp(28px, 4vw, 44px); font-weight: 800; letter-spacing: -0.025em; color: var(--text-1); margin-bottom: 12px; line-height: 1.1; }
+.section-rule { display: none; }
+.section-desc { font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 400; color: var(--text-3); line-height: 1.6; max-width: 520px; margin: 0 auto; }
+
+/* ── PAIN SECTION ── */
+#pain { padding: 100px 0; background: var(--bg-subtle); }
+.pain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 48px; }
+.pain-cell {
+  background: var(--bg-card); padding: 36px 32px; border-radius: var(--radius);
+  border: 1px solid var(--border); transition: box-shadow 200ms, transform 200ms;
+}
+.pain-cell:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.pain-stat { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; }
+.pain-icon { font-size: 22px; margin-bottom: 12px; }
+.pain-title { font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: var(--text-1); margin-bottom: 10px; letter-spacing: -0.01em; }
+.pain-desc { font-family: 'Inter', sans-serif; font-size: 14.5px; font-weight: 400; color: var(--text-3); line-height: 1.75; }
+.pain-vs { text-align: center; margin-top: 48px; font-family: 'Inter', sans-serif; font-size: clamp(17px, 2.5vw, 23px); font-style: italic; font-weight: 500; color: var(--text-3); }
+
+/* ── METRICS ── */
+#metrics { padding: 64px 0; background: var(--bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+.metric-cell { padding: 32px 24px; text-align: center; border-right: 1px solid var(--border); }
+.metric-cell:last-child { border-right: none; }
+.metric-cell:hover { background: var(--bg-subtle); }
+.metric-cell::after { display: none; }
+.metric-value { font-family: 'Inter', sans-serif; font-size: clamp(28px, 4vw, 44px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-1); line-height: 1; margin-bottom: 8px; }
+.metric-value span { color: var(--blue); }
+.metric-label { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-3); }
+
+/* ── FEATURES ── */
+#features { padding: 100px 0; }
+.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.feature-card {
+  background: var(--bg-card); padding: 36px 32px; border-radius: var(--radius);
+  border: 1px solid var(--border); transition: box-shadow 200ms, transform 200ms; position: relative; overflow: hidden;
+}
+.feature-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); background: var(--bg-card); }
+.feature-card::before { display: none; }
+.feature-icon { width: 44px; height: 44px; border-radius: 11px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; border: none; }
+.feature-card:nth-child(1) .feature-icon { background: var(--green-light); }
+.feature-card:nth-child(2) .feature-icon { background: var(--blue-light); }
+.feature-card:nth-child(3) .feature-icon { background: var(--gold-light); }
+.feature-card:nth-child(4) .feature-icon { background: #FFF0F3; }
+.feature-card:nth-child(5) .feature-icon { background: var(--blue-light); }
+.feature-card:nth-child(6) .feature-icon { background: var(--green-light); }
+.feature-icon-inner { width: 20px; height: 20px; border-radius: 5px; border: none; }
+.feature-card:nth-child(1) .feature-icon-inner { background: var(--green); }
+.feature-card:nth-child(2) .feature-icon-inner { background: var(--blue); }
+.feature-card:nth-child(3) .feature-icon-inner { background: var(--gold); }
+.feature-card:nth-child(4) .feature-icon-inner { background: #E53935; }
+.feature-card:nth-child(5) .feature-icon-inner { background: var(--blue); }
+.feature-card:nth-child(6) .feature-icon-inner { background: var(--green); }
+.feature-title { font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 700; color: var(--text-1); margin-bottom: 10px; letter-spacing: -0.01em; text-transform: none; }
+.feature-desc { font-family: 'Inter', sans-serif; font-size: 14.5px; font-weight: 400; color: var(--text-3); line-height: 1.75; }
+
+/* ── HOW IT WORKS ── */
+#how-it-works { padding: 100px 0; background: var(--bg-subtle); }
+.how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 48px; }
+.how-step { background: var(--bg-card); padding: 40px 32px; border-radius: var(--radius); border: 1px solid var(--border); position: relative; overflow: hidden; }
+.how-step::before { display: none; }
+.how-step-num { font-family: 'Inter', sans-serif; font-size: 48px; font-weight: 800; color: var(--blue-light); letter-spacing: -0.04em; line-height: 1; margin-bottom: 20px; }
+.how-step-title { font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 700; color: var(--text-1); margin-bottom: 10px; letter-spacing: -0.01em; }
+.how-step-desc { font-family: 'Inter', sans-serif; font-size: 14.5px; font-weight: 400; color: var(--text-3); line-height: 1.8; }
+
+/* ── COMPARISON TABLE ── */
+#comparison { padding: 100px 0; }
+.comparison-wrap { margin-top: 48px; border-radius: var(--radius); overflow: visible; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.comparison-table { width: 100%; border-collapse: collapse; }
+.comparison-table th { padding: 16px 24px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; text-align: center; border-bottom: 1px solid var(--border); color: var(--text-3); background: var(--bg-subtle); }
+.comparison-table th:first-child { text-align: left; }
+.comparison-table th.col-vault { color: var(--blue); background: var(--blue-light); }
+.comparison-table td { padding: 14px 24px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400; color: var(--text-3); border-bottom: 1px solid var(--border); text-align: center; background: var(--bg); }
+.comparison-table td:first-child { text-align: left; color: var(--text-2); font-weight: 500; background: var(--bg-subtle); }
+.comparison-table td.col-vault { background: var(--blue-faint); }
+.comparison-table tr:last-child td { border-bottom: none; }
+.cmp-yes { color: var(--green); font-size: 16px; font-weight: 700; }
+.cmp-no { color: #D1D5DB; font-size: 16px; }
+.cmp-partial { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ── DASHBOARD PREVIEW ── */
+#preview { padding: 30px 0 100px; }
+.preview-frame {
+  border-radius: var(--radius-lg); overflow: hidden; position: relative;
+  background: var(--bg-subtle); border: 1px solid var(--border); box-shadow: var(--shadow-xl);
+}
+.preview-corner { display: none; }
+.preview-topbar {
+  display: flex; align-items: center; gap: 8px; padding: 12px 18px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.preview-dot { width: 10px; height: 10px; border-radius: 50%; }
+.preview-label { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; color: var(--text-4); margin-left: 6px; }
+.preview-body { display: grid; grid-template-columns: 190px 1fr; min-height: 360px; }
+.preview-sidebar { border-right: 1px solid var(--border); padding: 20px 14px; display: flex; flex-direction: column; gap: 6px; background: var(--bg); }
+.preview-liq { padding: 16px 14px; background: var(--blue-faint); border-radius: var(--radius-sm); margin-bottom: 6px; border: 1px solid rgba(26,111,212,0.12); }
+.preview-liq-label { font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--blue); margin-bottom: 6px; }
+.preview-liq-value { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--text-1); letter-spacing: -0.03em; }
+.preview-liq-sub { font-family: 'Inter', sans-serif; font-size: 11px; color: var(--text-3); margin-top: 4px; }
+.preview-nav-item { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-3); padding: 8px 10px; border-radius: 6px; }
+.preview-nav-item.active { background: var(--blue-light); color: var(--blue); font-weight: 600; }
+.preview-main { padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg); }
+.preview-stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.preview-stat { padding: 16px 14px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border); position: relative; }
+.preview-stat-label { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.preview-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.preview-chart-box { background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 18px; flex: 1; position: relative; }
+.preview-chart-label { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; color: var(--text-3); margin-bottom: 12px; }
+.chart-area { fill: url(#chartGrad); }
+.chart-stroke { fill: none; stroke: var(--blue); stroke-width: 2; }
+.chart-dot { fill: var(--blue); }
+.chart-line { width: 100%; height: 80px; }
+.preview-callout {
+  position: absolute; background: var(--bg); border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm); border-radius: 6px;
+  padding: 5px 10px; font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; color: var(--text-2);
+  white-space: nowrap; pointer-events: none; z-index: 5;
+}
+.preview-demo-badge {
+  position: absolute; top: 52px; right: 14px; z-index: 5;
+  padding: 4px 12px; background: var(--green-light); border-radius: 100px;
+  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; color: var(--green);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+/* ── TESTIMONIALS / BETA OUTCOMES ── */
+#testimonials { padding: 100px 0; background: var(--bg-subtle); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.testimonials-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 48px; }
+.testimonial-card {
+  background: var(--bg-card); padding: 36px 32px; border-radius: var(--radius);
+  border: 1px solid var(--border); display: flex; flex-direction: column;
+  transition: box-shadow 200ms, transform 200ms;
+}
+.testimonial-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.testimonial-card::before { display: none; }
+.testimonial-stars { display: flex; gap: 4px; margin-bottom: 16px; }
+.star { width: 14px; height: 14px; background: var(--gold); clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.outcome-icon { font-size: 24px; opacity: 0.5; margin-bottom: 14px; color: var(--blue); }
+.testimonial-quote { font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 400; font-style: italic; color: var(--text-2); line-height: 1.65; margin-bottom: 20px; flex: 1; }
+.testimonial-author { display: flex; flex-direction: column; gap: 3px; }
+.testimonial-name { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: var(--text-1); }
+.testimonial-role { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--text-3); }
+.testimonial-tier { margin-top: 14px; padding: 4px 12px; background: var(--blue-light); border-radius: 100px; font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; color: var(--blue); display: inline-block; }
+.outcome-label { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--blue); margin-top: 10px; margin-bottom: 12px; }
+.beta-cta { text-align: center; margin-top: 44px; }
+.beta-cta-note { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; color: var(--text-3); margin-bottom: 16px; }
+
+/* ── URGENCY STRIP ── */
+#urgency {
+  padding: 22px 0; background: var(--gold-light);
+  border-top: 1px solid rgba(232,160,32,0.2); border-bottom: 1px solid rgba(232,160,32,0.2);
+}
+.urgency-inner { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.urgency-label { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 0.06em; }
+.urgency-counter { font-family: 'Inter', sans-serif; font-size: 26px; font-weight: 800; color: var(--text-1); letter-spacing: -0.03em; }
+.urgency-sub { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-3); }
+
+/* ── PRICING ── */
+#pricing { padding: 100px 0; }
+.pricing-toggle {
+  display: flex; align-items: center; gap: 12px; justify-content: center; margin-bottom: 48px;
+}
+.pricing-toggle-label { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-3); letter-spacing: normal; text-transform: none; }
+.pricing-toggle-track {
+  width: 48px; height: 26px; border-radius: 13px;
+  background: #D1D5DB; position: relative; cursor: pointer; transition: background 200ms;
+  border: none;
+}
+.pricing-toggle-track.annual { background: var(--blue); }
+.pricing-toggle-thumb {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 10px;
+  background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.2); transition: all 200ms; transform: translateX(0);
+}
+.pricing-toggle-track.annual .pricing-toggle-thumb { transform: translateX(22px); }
+.pricing-save-badge {
+  padding: 4px 12px; background: var(--green-light); border-radius: 100px;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700; color: var(--green);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border: none;
+}
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.pricing-card {
+  background: var(--bg-card); padding: 40px 32px 36px;
+  border-radius: var(--radius-lg); border: 1.5px solid var(--border);
+  display: flex; flex-direction: column; transition: box-shadow 200ms; position: relative;
+}
+.pricing-card::before { display: none; }
+.pricing-card.featured {
+  background: var(--bg); border-color: var(--blue);
+  box-shadow: 0 0 0 4px rgba(26,111,212,0.08), var(--shadow-lg); z-index: 2;
+}
+.pricing-card.featured::after { display: none; }
+.pricing-badge {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 18px;
+  padding: 5px 14px; background: var(--blue); border-radius: 100px;
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; color: white;
+  text-transform: uppercase; letter-spacing: 0.06em; align-self: flex-start;
+  position: static; top: auto; right: auto;
+}
+.pricing-tier { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+.pricing-price { display: flex; align-items: flex-start; gap: 2px; margin-bottom: 6px; line-height: 1; }
+.pricing-price sup { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; color: var(--text-2); margin-top: 8px; }
+.pricing-price-num { font-family: 'Inter', sans-serif; font-size: 64px; font-weight: 800; letter-spacing: -0.04em; color: var(--text-1); line-height: 1; }
+.pricing-price sub { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--text-3); align-self: flex-end; margin-bottom: 10px; font-weight: 500; }
+.pricing-annual-note { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--green); margin-bottom: 18px; display: block; min-height: 20px; }
+.pricing-desc { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400; color: var(--text-3); line-height: 1.65; margin-bottom: 24px; }
+.pricing-divider { height: 1px; background: var(--border); margin-bottom: 24px; }
+.pricing-features { list-style: none; flex: 1; margin-bottom: 32px; display: flex; flex-direction: column; gap: 10px; }
+.pricing-features li { display: flex; align-items: flex-start; gap: 10px; font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 400; color: var(--text-3); }
+.pricing-features li.has { color: var(--text-2); }
+.feat-check { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; font-size: 11px; font-weight: 700; border: none; }
+li.has .feat-check { background: var(--green-light); color: var(--green); }
+li.has .feat-check::after { content: '✓'; }
+li:not(.has) .feat-check { background: #F3F4F6; color: #D1D5DB; }
+li:not(.has) .feat-check::after { content: '✕'; font-weight: 400; font-size: 10px; }
+.feat-check-inner { display: none; }
+.pricing-btn {
+  display: block; width: 100%; padding: 14px 20px; text-align: center;
+  background: var(--bg-subtle); border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-2);
+  text-decoration: none; cursor: pointer; transition: all 200ms;
+}
+.pricing-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-faint); }
+.pricing-btn.featured-btn {
+  background: var(--blue); border-color: var(--blue); color: white;
+  box-shadow: 0 4px 16px rgba(26,111,212,0.3);
+}
+.pricing-btn.featured-btn:hover { background: var(--blue-dark); border-color: var(--blue-dark); box-shadow: 0 6px 24px rgba(26,111,212,0.4); }
+.pricing-note { text-align: center; margin-top: 24px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-3); }
+.pricing-note span { color: var(--green); font-weight: 600; }
+
+/* ── OBJECTIONS ── */
+#objections { padding: 100px 0; background: var(--bg-subtle); }
+.objections-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 48px; }
+.objection-card { background: var(--bg-card); padding: 36px 32px; border-radius: var(--radius); border: 1px solid var(--border); }
+.objection-card::before { display: none; }
+.objection-q { font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 700; color: var(--text-1); margin-bottom: 12px; letter-spacing: -0.01em; }
+.objection-a { font-family: 'Inter', sans-serif; font-size: 14.5px; font-weight: 400; color: var(--text-3); line-height: 1.75; }
+
+/* ── GUARANTEE ── */
+#guarantee { padding: 80px 0; }
+.guarantee-inner {
+  max-width: 660px; margin: 0 auto; text-align: center;
+  padding: 52px 48px; background: var(--blue-faint); border-radius: var(--radius-xl);
+  border: 1px solid rgba(26,111,212,0.12);
+}
+.guarantee-inner::before { display: none; }
+.guarantee-icon { width: 56px; height: 56px; background: var(--blue-light); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; }
+.guarantee-icon::before { display: none; }
+.guarantee-icon-inner { width: 24px; height: 24px; background: var(--blue); border-radius: 6px; border: none; }
+.guarantee-title { font-family: 'Inter', sans-serif; font-size: 24px; font-weight: 800; color: var(--text-1); margin-bottom: 16px; letter-spacing: -0.02em; }
+.guarantee-text { font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 400; font-style: italic; color: var(--text-3); line-height: 1.75; }
+
+/* ── PHILOSOPHY ── */
+#philosophy { padding: 90px 0; background: var(--bg-subtle); border-top: 1px solid var(--border); }
+.philosophy-quote { font-family: 'Inter', sans-serif; font-size: clamp(22px, 3.5vw, 36px); font-weight: 700; letter-spacing: -0.025em; color: var(--text-1); line-height: 1.35; text-align: center; max-width: 660px; margin: 0 auto; font-style: italic; }
+.philosophy-attr { text-align: center; margin-top: 18px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; }
+
+/* ── FINAL CTA ── */
+#cta { padding: 110px 0; background: var(--blue); position: relative; overflow: hidden; }
+#cta::before {
+  content: ''; position: absolute; top: -150px; right: -100px;
+  width: 600px; height: 600px; border-radius: 50%;
+  background: rgba(255,255,255,0.05); pointer-events: none;
+}
+.cta-inner { max-width: 680px; margin: 0 auto; text-align: center; position: relative; z-index: 1; }
+.cta-eyebrow { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.65); display: block; margin-bottom: 14px; }
+.cta-title { font-family: 'Inter', sans-serif; font-size: clamp(36px, 5.5vw, 60px); font-weight: 800; letter-spacing: -0.035em; color: white; margin-bottom: 10px; line-height: 1.05; }
+.cta-spots-note { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.cta-sub { font-family: 'Inter', sans-serif; font-size: 17px; font-weight: 400; color: rgba(255,255,255,0.78); line-height: 1.6; margin-bottom: 40px; }
+.cta-actions { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+.cta-actions .btn-primary { background: white; color: var(--blue); box-shadow: 0 4px 24px rgba(0,0,0,0.15); }
+.cta-actions .btn-primary:hover { background: rgba(255,255,255,0.93); color: var(--blue-dark); transform: translateY(-1px); }
+.cta-actions .btn-secondary { border-color: rgba(255,255,255,0.35); color: white; }
+.cta-actions .btn-secondary:hover { border-color: rgba(255,255,255,0.7); color: white; }
+.cta-fine { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.55); }
+.cta-fine span { color: rgba(255,255,255,0.82); }
+
+/* ── TRUST STRIP ── */
+.trust-strip { padding: 36px 0; background: var(--bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.trust-strip-inner { display: flex; align-items: center; justify-content: center; gap: 36px; flex-wrap: wrap; }
+.trust-item { display: flex; align-items: center; gap: 8px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--text-3); }
+.trust-item-icon { font-size: 15px; }
+
+/* ── EMAIL CAPTURE ── */
+.email-capture { padding: 44px; background: var(--bg-subtle); text-align: center; border-top: 1px solid var(--border); }
+.email-capture-label { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-3); margin-bottom: 16px; display: block; }
+.email-form { display: inline-flex; gap: 0; max-width: 420px; width: 100%; border-radius: var(--radius-sm); overflow: hidden; border: 1.5px solid var(--border); box-shadow: var(--shadow-xs); }
+.email-input {
+  flex: 1; padding: 12px 16px; background: var(--bg); border: none; outline: none;
+  font-family: 'Inter', sans-serif; font-size: 14px; color: var(--text-1);
+}
+.email-input::placeholder { color: var(--text-4); }
+.email-btn {
+  padding: 12px 22px; background: var(--blue); border: none;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: white;
+  cursor: pointer; white-space: nowrap; transition: background 200ms;
+}
+.email-btn:hover { background: var(--blue-dark); }
+
+/* ── FOOTER ── */
+footer {
+  padding: 32px 40px; background: var(--bg); border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+}
+.footer-logo { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 800; letter-spacing: -0.01em; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
+.footer-logo-shield { width: 18px; height: 18px; object-fit: contain; opacity: 0.4; }
+.footer-links { display: flex; gap: 20px; }
+.footer-links a { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-3); text-decoration: none; transition: color 180ms; }
+.footer-links a:hover { color: var(--text-1); }
+.footer-copy { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-4); }
+
+/* ── STICKY CTA BAR ── */
+.sticky-cta {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 150;
+  background: rgba(255,255,255,0.96); backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border); box-shadow: 0 -4px 24px rgba(0,0,0,0.06);
+  padding: 14px 40px;
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+.sticky-cta.visible { transform: translateY(0); }
+.sticky-cta-left { display: flex; flex-direction: column; gap: 3px; }
+.sticky-cta-brand { display: flex; align-items: center; gap: 7px; }
+.sticky-cta-title { font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 800; color: var(--text-1); letter-spacing: -0.02em; }
+.sticky-cta-logo { width: 22px; height: 22px; object-fit: contain; }
+.sticky-cta-sub { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; color: var(--text-3); }
+.sticky-cta-right { display: flex; align-items: center; gap: 14px; }
+
+/* ── EXIT INTENT OVERLAY ── */
+.exit-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.35); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s;
+}
+.exit-overlay.active { opacity: 1; pointer-events: all; }
+.exit-modal {
+  max-width: 520px; width: 90%; padding: 48px 44px; border-radius: var(--radius-xl);
+  background: var(--bg); box-shadow: var(--shadow-xl); position: relative; text-align: center;
+  border: 1px solid var(--border);
+}
+.exit-modal::before { display: none; }
+.exit-close { position: absolute; top: 16px; right: 18px; font-size: 18px; color: var(--text-4); cursor: pointer; background: none; border: none; font-family: inherit; transition: color 200ms; line-height: 1; }
+.exit-close:hover { color: var(--text-1); }
+.exit-eyebrow { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; display: block; }
+.exit-title { font-family: 'Inter', sans-serif; font-size: 26px; font-weight: 800; color: var(--text-1); margin-bottom: 12px; line-height: 1.15; letter-spacing: -0.02em; }
+.exit-sub { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 400; color: var(--text-3); line-height: 1.65; margin-bottom: 28px; }
+.exit-offer { padding: 18px 20px; background: var(--green-light); border-radius: var(--radius-sm); border: 1px solid rgba(0,184,118,0.2); margin-bottom: 24px; text-align: left; }
+.exit-offer-line { display: flex; align-items: center; gap: 10px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--green); margin-bottom: 8px; }
+.exit-offer-line:last-child { margin-bottom: 0; }
+.exit-offer-check { width: 16px; height: 16px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 9px; font-weight: 900; flex-shrink: 0; }
+.exit-dismiss { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-4); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; background: none; border: none; transition: color 200ms; }
+.exit-dismiss:hover { color: var(--text-2); }
+
+/* ── RESPONSIVE ── */
+
+/* ── Tablet: 960px ── */
+@media (max-width: 960px) {
+  /* Nav */
+  nav { padding: 12px 24px; }
+  .nav-links { display: none; }
+  .nav-mobile-cta { display: flex; padding: 9px 18px; background: var(--blue); color: white; border-radius: var(--radius-sm); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; align-items: center; }
+
+  /* Layout */
+  .container { padding: 0 24px; }
+
+  /* Grids → single column */
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+  .pricing-grid, .testimonials-grid { grid-template-columns: 1fr; }
+  .pain-grid, .objections-grid { grid-template-columns: 1fr; }
+  .how-steps { grid-template-columns: 1fr; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .pricing-card.featured { order: -1; }
+
+  /* Dashboard preview */
+  .preview-body { grid-template-columns: 1fr; }
+  .preview-sidebar { display: none; }
+  .preview-stats-row { grid-template-columns: repeat(2, 1fr); }
+
+  /* Comparison table — allow horizontal scroll */
+  .comparison-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Sections */
+  #pain, #features, #how-it-works, #comparison, #testimonials,
+  #pricing, #objections, #guarantee, #philosophy { padding: 72px 0; }
+
+  /* Sticky CTA */
+  .sticky-cta { padding: 12px 20px; gap: 12px; }
+
+  /* Footer */
+  footer { flex-direction: column; text-align: center; gap: 14px; }
+  .footer-links { justify-content: center; }
+}
+
+/* ── Large mobile: 768px ── */
+@media (max-width: 768px) {
+  /* Hero */
+  #hero { padding: 100px 20px 80px; min-height: 100svh; }
+  .hero-inner { padding: 0; }
+  .hero-sub { font-size: clamp(30px, 8vw, 48px); }
+  .hero-tagline { font-size: 16px; }
+  .hero-trust { gap: 10px; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .hero-trust-divider { display: none; }
+
+  /* Announcement bar */
+  .ann-bar { font-size: 11px; gap: 6px; padding: 9px 16px; }
+  .ann-bar span:nth-child(3) { display: none; }
+
+  /* Grids */
+  .features-grid { grid-template-columns: 1fr; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Pricing */
+  .pricing-price-num { font-size: 48px; }
+  .pricing-card { padding: 28px 20px 24px; }
+  .pricing-toggle { margin-bottom: 28px; }
+
+  /* Sections padding */
+  #pain, #features, #how-it-works, #comparison, #testimonials,
+  #pricing, #objections, #guarantee, #philosophy { padding: 56px 0; }
+  #preview { padding: 16px 0 64px; }
+  .section-header { margin-bottom: 32px; }
+
+  /* How it works */
+  .how-step { padding: 28px 20px; }
+  .how-step-num { font-size: 40px; }
+
+  /* Guarantee */
+  .guarantee-inner { padding: 36px 20px; }
+
+  /* Urgency strip */
+  .urgency-inner { flex-direction: column; gap: 6px; text-align: center; }
+  .urgency-counter { font-size: 22px; }
+
+  /* Email capture */
+  .email-capture { padding: 36px 20px; }
+  .email-form { flex-direction: column; max-width: 100%; }
+  .email-btn { border-radius: var(--radius-sm); }
+  .email-input { border-radius: var(--radius-sm); }
+
+  /* Trust strip */
+  .trust-strip-inner { gap: 16px; flex-wrap: wrap; justify-content: center; }
+
+  /* Footer */
+  footer { padding: 28px 20px; }
+  .footer-links { gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+  /* Sticky CTA */
+  .sticky-cta { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 16px; }
+  .sticky-cta-left { align-items: center; }
+  .sticky-cta-sub { text-align: center; }
+  .sticky-cta-right { flex-direction: column; align-items: stretch; gap: 8px; }
+  .sticky-cta-right .btn-primary { width: 100%; justify-content: center; }
+  .sticky-spots-pill { justify-content: center; }
+
+  /* Exit modal */
+  .exit-modal { padding: 36px 20px; margin: 16px; width: calc(100% - 32px); }
+  .exit-title { font-size: 22px; }
+}
+
+/* ── Mobile: 480px ── */
+@media (max-width: 480px) {
+  /* Container */
+  .container { padding: 0 16px; }
+
+  /* Hero */
+  #hero { padding: 90px 16px 80px; }
+  .hero-sub { font-size: clamp(28px, 9vw, 40px); letter-spacing: -0.03em; }
+  .hero-tagline { font-size: 15px; }
+  .hero-actions { flex-direction: column; width: 100%; gap: 10px; }
+  .btn-primary, .btn-secondary { width: 100%; justify-content: center; padding: 14px 20px; font-size: 14px; }
+  .hero-trust { gap: 8px; }
+  .hero-trust-item { font-size: 12px; }
+
+  /* Announcement bar */
+  .ann-bar { padding: 8px 12px; font-size: 10.5px; }
+
+  /* Metrics */
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .metric-cell { border-right: none; border-bottom: 1px solid var(--border); padding: 20px 12px; }
+  .metric-value { font-size: 28px; }
+
+  /* Dashboard preview */
+  .preview-stats-row { grid-template-columns: 1fr 1fr; }
+  .preview-main { padding: 16px; gap: 12px; }
+  .preview-stat-val { font-size: 15px; }
+
+  /* Comparison table */
+  .comparison-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .comparison-table { min-width: 480px; }
+  .comparison-table th, .comparison-table td { padding: 10px 12px; font-size: 11px; }
+
+  /* Pain + objections grid */
+  .pain-grid, .objections-grid { grid-template-columns: 1fr; gap: 12px; }
+  .pain-cell, .objection-card { padding: 24px 18px; }
+
+  /* Features */
+  .feature-card { padding: 24px 18px; }
+
+  /* Pricing */
+  .pricing-price-num { font-size: 42px; }
+  .pricing-grid { gap: 12px; }
+
+  /* Testimonials */
+  .testimonial-card { padding: 24px 18px; }
+  .testimonial-quote { font-size: 14px; }
+
+  /* Section headers */
+  .section-title { font-size: clamp(22px, 6vw, 32px); }
+  .section-desc { font-size: 14px; }
+
+  /* How steps */
+  .how-step { padding: 24px 18px; }
+  .how-step-num { font-size: 36px; }
+  .how-step-title { font-size: 16px; }
+
+  /* Urgency */
+  #urgency { padding: 16px 0; }
+
+  /* Philosophy */
+  .philosophy-quote { font-size: clamp(18px, 5vw, 26px); padding: 0 8px; }
+
+  /* CTA section */
+  #cta { padding: 72px 0; }
+  .cta-title { font-size: clamp(26px, 8vw, 40px); }
+  .cta-sub { font-size: 15px; }
+  .cta-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+  .cta-actions .btn-primary, .cta-actions .btn-secondary { width: 100%; justify-content: center; }
+
+  /* Guarantee */
+  .guarantee-inner { padding: 28px 16px; }
+  .guarantee-title { font-size: 20px; }
+  .guarantee-text { font-size: 15px; }
+
+  /* Exit modal */
+  .exit-modal { padding: 28px 16px; }
+  .exit-title { font-size: 20px; }
+
+  /* Footer */
+  footer { padding: 24px 16px; gap: 12px; }
+  .footer-links { gap: 10px; }
+  .footer-links a, .footer-copy { font-size: 12px; }
+
+  /* Ticker */
+  .ticker-item { font-size: 12px; padding: 0 20px; }
+
+  /* Bottom ticker height — give hero enough bottom breathing room */
+  #bottom-ticker { padding: 11px 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- BG -->
+<div class="page-grid"></div>
+<div class="vignette"></div>
+
+<!-- ENG FRAME -->
+<div class="eng-frame">
+  <div class="eng-border"></div>
+  <div class="eng-corner tl"></div><div class="eng-corner tr"></div>
+  <div class="eng-corner bl"></div><div class="eng-corner br"></div>
+  <span class="eng-coord tl" id="coord-tl">00.00 · 00.00</span>
+  <span class="eng-coord tr">SYS · ACTIVE</span>
+  <span class="eng-coord bl">VAULTIQ · OS · v3.0</span>
+  <span class="eng-coord br">ENCRYPTED</span>
+</div>
+
+<!-- ANNOUNCEMENT BAR -->
+<div class="ann-bar">
+  <div class="ann-dot"></div>
+  <span>Founding member pricing — <strong id="spots-count">47</strong> spots remaining at current rate</span>
+  <span>·</span>
+  <a href="#pricing">Lock in your tier →</a>
+</div>
+
+<!-- NAV -->
+<nav id="main-nav">
+  <div class="nav-logo"><img src="TheVaultShield.png" class="nav-logo-shield" alt="VaultIQ Shield" />VAULT<span>IQ</span></div>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#testimonials">Results</a></li>
+    <li><span class="nav-trial-count" id="nav-spots">47 spots left</span></li>
+    <li><a href="#pricing" class="nav-cta">Start Free Trial</a></li>
+  </ul>
+  <a href="#pricing" class="nav-mobile-cta">Start Free →</a>
+</nav>
+
+<div class="page">
+
+<!-- ═══ HERO ═══ -->
+<section id="hero">
+  <div class="hero-inner">
+    <div class="hero-kicker">
+      <div class="hero-kicker-line"></div>
+      <span class="hero-kicker-text">Private Financial Intelligence</span>
+      <div class="hero-kicker-line r"></div>
+    </div>
+    <div class="hero-wordmark">VAULT<span class="hero-wordmark-iq">IQ</span></div>
+    <div class="hero-rule">
+      <div class="hero-rule-line"></div>
+      <div class="hero-rule-diamond"></div>
+      <div class="hero-rule-line r"></div>
+    </div>
+    <div class="hero-sub">Know Your <em>Runway</em>.<br/>Command Your Capital.</div>
+    <div class="hero-tagline">The financial command center for operators who run lean. Stop guessing. Start commanding.</div>
+    <div class="hero-actions">
+      <a href="/api/checkout?tier=operator" class="btn-primary btn-primary-lg">
+        <span>Enter the Vault — Free for 14 Days</span>
+      </a>
+      <a href="#preview" class="btn-secondary">See Inside the Vault</a>
+    </div>
+    <div class="hero-trust">
+      <div class="hero-trust-item"><span class="hero-trust-check">✓</span> No credit card required</div>
+      <div class="hero-trust-divider"></div>
+      <div class="hero-trust-item"><span class="hero-trust-check">✓</span> 14-day free trial</div>
+      <div class="hero-trust-divider"></div>
+      <div class="hero-trust-item"><span class="hero-trust-check">✓</span> Cancel anytime</div>
+    </div>
+
+  </div>
+
+  <!-- Ticker lives inside hero, anchored to its bottom -->
+  <div id="bottom-ticker">
+    <div class="ticker-track" id="ticker">
+      <div class="ticker-item"><span>✓</span> Operator saved 14 hrs/month tracking cash flow <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Freelancer hit $18k/mo after tracking burn properly <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Agency owner closed books 3x faster <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Consultant cut unnecessary spend by $2,400/mo <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Solo founder finally knows their true runway <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Operator saved 14 hrs/month tracking cash flow <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Freelancer hit $18k/mo after tracking burn properly <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Agency owner closed books 3x faster <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Consultant cut unnecessary spend by $2,400/mo <span class="ticker-sep">·</span></div>
+      <div class="ticker-item"><span>✓</span> Solo founder finally knows their true runway <span class="ticker-sep">·</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PAIN SECTION ═══ -->
+<section id="pain">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">The Problem</span>
+      <div class="section-title">Operating Blind Is Expensive</div>
+      <div class="section-rule">
+        <div class="section-rule-line"></div>
+        <div class="section-rule-dot"></div>
+        <div class="section-rule-line r"></div>
+      </div>
+      <p class="section-desc">Most operators don't have a money problem. They have a visibility problem.</p>
+    </div>
+    <div class="pain-grid reveal">
+      <div class="pain-cell">
+        <div class="pain-stat">3 spreadsheets · 1 question · still no answer</div>
+        <div class="pain-icon">⚠</div>
+        <div class="pain-title">You don't know your real runway</div>
+        <p class="pain-desc">You know your bank balance. You don't know how many days that buys you at current burn. Those are very different numbers — and confusing them is how operations fail.</p>
+      </div>
+      <div class="pain-cell">
+        <div class="pain-stat">2–4 hrs/week lost to manual reconciliation</div>
+        <div class="pain-icon">⚠</div>
+        <div class="pain-title">Spreadsheets lie when you're busy</div>
+        <p class="pain-desc">A spreadsheet requires your discipline to be accurate. When revenue spikes or burn changes, it goes stale. You're making decisions on last month's data.</p>
+      </div>
+      <div class="pain-cell">
+        <div class="pain-stat">Average undetected budget overrun: $1,200/mo</div>
+        <div class="pain-icon">⚠</div>
+        <div class="pain-title">You react to problems instead of prevent them</div>
+        <p class="pain-desc">Budget overruns, cash crunches, surprise expenses — they all have early warning signals. Without a system watching, you see them only after they've already happened.</p>
+      </div>
+      <div class="pain-cell">
+        <div class="pain-stat">QuickBooks: avg 6 hrs to get one operational answer</div>
+        <div class="pain-icon">⚠</div>
+        <div class="pain-title">QuickBooks is built for accountants, not operators</div>
+        <p class="pain-desc">Complex, cluttered, designed for tax time — not for daily command decisions. You need to glance at a number when you open your laptop, not file a report.</p>
+      </div>
+    </div>
+    <div class="pain-vs reveal">
+      "VaultIQ is the command center that QuickBooks was never designed to be."
+    </div>
+  </div>
+</section>
+
+<!-- ═══ METRICS ═══ -->
+<section id="metrics">
+  <div class="container">
+    <div class="metrics-grid reveal">
+      <div class="metric-cell">
+        <div class="metric-value">$0<span>&nbsp;hidden</span></div>
+        <div class="metric-label">Zero Hidden Fees</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-value">14<span>-day</span></div>
+        <div class="metric-label">Free Trial, No Card</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-value">100<span>%</span></div>
+        <div class="metric-label">Cloud Encrypted</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-value">Real<span>-time</span></div>
+        <div class="metric-label">Capital Visibility</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section id="features">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Intelligence Suite</span>
+      <div class="section-title">Built For Operators</div>
+      <div class="section-rule">
+        <div class="section-rule-line"></div><div class="section-rule-dot"></div><div class="section-rule-line r"></div>
+      </div>
+      <p class="section-desc">Not a budgeting app. A financial command center engineered for those who treat capital as their most critical resource.</p>
+    </div>
+    <div class="features-grid reveal">
+      <div class="feature-card">
+        <div class="feature-icon"><div class="feature-icon-inner"></div></div>
+        <div class="feature-title">Runway Intelligence</div>
+        <p class="feature-desc">Stop guessing. Know exactly how many days your operation survives at current burn — updated automatically every time you record a transaction. No spreadsheet required.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><div class="feature-icon-inner"></div></div>
+        <div class="feature-title">Capital Command</div>
+        <p class="feature-desc">Open your laptop. Your total capital position is already there — base liquidity plus net activity, synthesized in real time the moment you log in.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><div class="feature-icon-inner"></div></div>
+        <div class="feature-title">Anomaly Detection</div>
+        <p class="feature-desc">Unusual charges surface automatically — before they compound. Silent intelligence running in the background, always watching, never in the way.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><div class="feature-icon-inner"></div></div>
+        <div class="feature-title">Budget Containment</div>
+        <p class="feature-desc">Category ceiling breached? You'll know before the month closes — not after it hurts. Set limits, get alerted at threshold, stay in control.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><div class="feature-icon-inner"></div></div>
+        <div class="feature-title">Cloud Vault Sync</div>
+        <p class="feature-desc">Your numbers follow you. End-to-end encrypted and synchronized across every device — open from anywhere, always current, always yours.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><div class="feature-icon-inner"></div></div>
+        <div class="feature-title">Recurring Engine</div>
+        <p class="feature-desc">Nothing surprises you. Subscriptions, retainers, and contracts are projected forward automatically — your future burn is always accounted for.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section id="how-it-works">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Get Started</span>
+      <div class="section-title">Up and Running in Minutes</div>
+      <div class="section-rule">
+        <div class="section-rule-line"></div><div class="section-rule-dot"></div><div class="section-rule-line r"></div>
+      </div>
+      <p class="section-desc">No accountant required. No complex setup. Your command center is live from day one.</p>
+    </div>
+    <div class="how-steps reveal">
+      <div class="how-step">
+        <div class="how-step-num">01</div>
+        <div class="how-step-title">Set Your Capital Position</div>
+        <p class="how-step-desc">Enter your starting liquidity in 60 seconds. This is your baseline — the number VaultIQ uses to calculate your runway from the moment you begin.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">02</div>
+        <div class="how-step-title">Log Your Transactions</div>
+        <p class="how-step-desc">Add income, expenses, and recurring obligations. VaultIQ categorizes them automatically and projects recurring items forward — nothing slips through.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">03</div>
+        <div class="how-step-title">Command Your Runway</div>
+        <p class="how-step-desc">Your dashboard is live. Know your burn rate, available capital, and exact runway in days — updated every time you record a transaction. No guesswork.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ COMPARISON TABLE ═══ -->
+<section id="comparison">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">The Difference</span>
+      <div class="section-title">Why Operators Switch</div>
+      <div class="section-rule">
+        <div class="section-rule-line"></div><div class="section-rule-dot"></div><div class="section-rule-line r"></div>
+      </div>
+      <p class="section-desc">VaultIQ isn't a replacement for your accountant — it's the clarity layer between you and every financial decision you make daily.</p>
+    </div>
+    <div class="comparison-wrap reveal">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="col-vault">VaultIQ</th>
+            <th>Spreadsheet</th>
+            <th>QuickBooks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Real-time runway calculation</td>
+            <td class="col-vault"><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-no">✗</span></td>
+            <td><span class="cmp-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>Built for daily operator decisions</td>
+            <td class="col-vault"><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-no">✗</span></td>
+            <td><span class="cmp-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>Anomaly detection on spending</td>
+            <td class="col-vault"><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-no">✗</span></td>
+            <td><span class="cmp-partial">Partial</span></td>
+          </tr>
+          <tr>
+            <td>Setup in under 5 minutes</td>
+            <td class="col-vault"><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>No accountant required</td>
+            <td class="col-vault"><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>Budget alerts before overrun</td>
+            <td class="col-vault"><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-no">✗</span></td>
+            <td><span class="cmp-partial">Partial</span></td>
+          </tr>
+          <tr>
+            <td>Recurring transaction projection</td>
+            <td class="col-vault"><span class="cmp-yes">✓</span></td>
+            <td><span class="cmp-no">✗</span></td>
+            <td><span class="cmp-partial">Partial</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DASHBOARD PREVIEW ═══ -->
+<section id="preview">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">The Interface</span>
+      <div class="section-title">Sneak Peak</div>
+      <div class="section-rule">
+        <div class="section-rule-line"></div><div class="section-rule-dot"></div><div class="section-rule-line r"></div>
+      </div>
+      <p class="section-desc">Precision-engineered. Nothing excess. Every element earns its place.</p>
+    </div>
+    <div class="preview-frame reveal" style="position:relative;">
+      <div class="preview-corner tl"></div><div class="preview-corner tr"></div>
+      <div class="preview-corner bl"></div><div class="preview-corner br"></div>
+      <div class="preview-demo-badge">Demo Mode</div>
+      <div class="preview-topbar">
+        <div class="preview-dot" style="background:rgba(255,127,159,0.4)"></div>
+        <div class="preview-dot" style="background:rgba(226,201,131,0.3)"></div>
+        <div class="preview-dot" style="background:rgba(70,231,169,0.3)"></div>
+        <span class="preview-label">VAULTIQ · COMMAND OVERVIEW · SECURE SESSION ACTIVE</span>
+      </div>
+      <div class="preview-body">
+        <div class="preview-sidebar">
+          <div class="preview-liq" style="position:relative;">
+            <div class="preview-liq-label">Available Capital</div>
+            <div class="preview-liq-value" id="preview-capital">$24,850</div>
+            <div class="preview-liq-sub">Live capital position</div>
+          </div>
+          <div class="preview-nav-item active">Overview</div>
+          <div class="preview-nav-item">Calendar</div>
+          <div class="preview-nav-item">Ledger</div>
+          <div class="preview-nav-item">Settings</div>
+        </div>
+        <div class="preview-main">
+          <div class="preview-stats-row">
+            <div class="preview-stat">
+              <div class="preview-stat-label">Net Position</div>
+              <div class="preview-stat-val" style="color:#46e7a9">+$12,160</div>
+            </div>
+            <div class="preview-stat">
+              <div class="preview-stat-label">Monthly Income</div>
+              <div class="preview-stat-val" style="color:#46e7a9">$18,400</div>
+            </div>
+            <div class="preview-stat">
+              <div class="preview-stat-label">Burn Rate</div>
+              <div class="preview-stat-val" style="color:#ff7f9f">$6,240</div>
+            </div>
+            <div class="preview-stat" style="position:relative;">
+              <div class="preview-callout" style="top:-32px;right:0;font-size:7px;">← Days of runway at current burn</div>
+              <div class="preview-stat-label">Runway</div>
+              <div class="preview-stat-val" style="color:#e2c983">114 days</div>
+            </div>
+          </div>
+          <div class="preview-chart-box" style="position:relative;">
+            <div class="preview-callout" style="bottom:8px;right:12px;">↑ 6-month net trend</div>
+            <div class="preview-chart-label">Net Capital · 6 Month Trend</div>
+            <svg class="chart-line" viewBox="0 0 600 80" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(26,111,212,0.14)"/>
+                  <stop offset="100%" stop-color="rgba(26,111,212,0)"/>
+                </linearGradient>
+              </defs>
+              <path class="chart-area" d="M0,68 L80,60 L160,52 L240,44 L320,36 L400,26 L480,16 L600,8 L600,80 L0,80 Z"/>
+              <path class="chart-stroke" d="M0,68 L80,60 L160,52 L240,44 L320,36 L400,26 L480,16 L600,8"/>
+              <circle class="chart-dot" cx="600" cy="8" r="3"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ WHAT OPERATORS ARE DISCOVERING ═══ -->
+<section id="testimonials">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Beta Program · Early Access</span>
+      <div class="section-title">What Operators Are Discovering</div>
+      <div class="section-rule">
+        <div class="section-rule-line"></div><div class="section-rule-dot"></div><div class="section-rule-line r"></div>
+      </div>
+      <p class="section-desc">Real outcomes from operators in our early access program. Real numbers. No fluff.</p>
+    </div>
+    <div class="testimonials-grid reveal">
+      <div class="testimonial-card">
+        <div class="outcome-icon">◈</div>
+        <div class="testimonial-quote">"Identified $340/mo in forgotten recurring charges within the first week of using the platform."</div>
+        <div class="outcome-label">Anomaly Detection in Action</div>
+        <div class="testimonial-tier">Solo Tier · Beta Operator</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="outcome-icon">◈</div>
+        <div class="testimonial-quote">"Went from 'I think I have enough' to '87 days of runway' — same financial data, completely different level of clarity."</div>
+        <div class="outcome-label">Runway Intelligence</div>
+        <div class="testimonial-tier">Operator Tier · Beta Operator</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="outcome-icon">◈</div>
+        <div class="testimonial-quote">"Replaced a 3-spreadsheet morning routine with a 15-second dashboard check. That's the trade I didn't know I needed."</div>
+        <div class="outcome-label">Capital Command</div>
+        <div class="testimonial-tier">Studio Tier · Beta Operator</div>
+      </div>
+    </div>
+    <div class="beta-cta reveal">
+      <p class="beta-cta-note">Join 47 founding members building their financial command center</p>
+      <a href="#pricing" class="btn-primary">Secure Your Founding Spot →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ URGENCY STRIP ═══ -->
+<section id="urgency">
+  <div class="container">
+    <div class="urgency-inner">
+      <div class="urgency-label">Founding Member Rate</div>
+      <div class="urgency-counter" id="urgency-spots">47</div>
+      <div class="urgency-sub">Spots remaining at current pricing · Price increases when full</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRICING ═══ -->
+<section id="pricing">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Access Tiers</span>
+      <div class="section-title">Choose Your Position</div>
+      <div class="section-rule">
+        <div class="section-rule-line"></div><div class="section-rule-dot"></div><div class="section-rule-line r"></div>
+      </div>
+      <p class="section-desc">Every plan starts with 14 days free. No credit card needed. No contracts. Cancel anytime.</p>
+    </div>
+
+    <div class="pricing-toggle">
+      <span class="pricing-toggle-label" id="toggle-monthly-label">Monthly</span>
+      <div class="pricing-toggle-track annual" id="billing-toggle" onclick="toggleBilling()">
+        <div class="pricing-toggle-thumb" id="billing-thumb"></div>
+      </div>
+      <span class="pricing-toggle-label" id="toggle-annual-label" style="color:var(--text-bright);">Annual</span>
+      <div class="pricing-save-badge">Save 20%</div>
+    </div>
+
+    <div class="pricing-grid reveal">
+
+      <!-- SOLO -->
+      <div class="pricing-card">
+        <div class="pricing-tier">Solo</div>
+        <div class="pricing-price">
+          <sup>$</sup>
+          <div class="pricing-price-num" id="price-solo">29</div>
+          <sub>/ mo</sub>
+        </div>
+        <span class="pricing-annual-note" id="note-solo"></span>
+        <p class="pricing-desc">For the individual operator managing a single operation with clarity and discipline.</p>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Full dashboard access</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Cloud sync & encryption</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Runway calculator</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Budget alert engine</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Recurring transactions</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>CSV / JSON export</li>
+          <li><span class="feat-check"><div class="feat-check-inner"></div></span>Multi-entity support</li>
+          <li><span class="feat-check"><div class="feat-check-inner"></div></span>PDF statement export</li>
+          <li><span class="feat-check"><div class="feat-check-inner"></div></span>Accountant access</li>
+        </ul>
+        <a href="/api/checkout?tier=solo" class="pricing-btn">Begin 14-Day Trial →</a>
+      </div>
+
+      <!-- OPERATOR (FEATURED) -->
+      <div class="pricing-card featured">
+        <div class="pricing-badge">Most Chosen</div>
+        <div class="pricing-tier">Operator</div>
+        <div class="pricing-price">
+          <sup>$</sup>
+          <div class="pricing-price-num" id="price-operator">79</div>
+          <sub>/ mo</sub>
+        </div>
+        <span class="pricing-annual-note" id="note-operator"></span>
+        <p class="pricing-desc">For the serious operator running multiple income streams who demands complete financial visibility.</p>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Everything in Solo</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Multi-entity support</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>PDF statement export</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Anomaly detection alerts</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Priority cloud sync</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Advanced category control</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Accountant read access</li>
+          <li><span class="feat-check"><div class="feat-check-inner"></div></span>Team seats (up to 3)</li>
+          <li><span class="feat-check"><div class="feat-check-inner"></div></span>Shared ledger view</li>
+        </ul>
+        <a href="/api/checkout?tier=operator" class="pricing-btn featured-btn">Begin 14-Day Trial →</a>
+      </div>
+
+      <!-- STUDIO -->
+      <div class="pricing-card">
+        <div class="pricing-tier">Studio</div>
+        <div class="pricing-price">
+          <sup>$</sup>
+          <div class="pricing-price-num" id="price-studio">149</div>
+          <sub>/ mo</sub>
+        </div>
+        <span class="pricing-annual-note" id="note-studio"></span>
+        <p class="pricing-desc">For agencies, studios, and small teams who need shared financial intelligence across multiple collaborators.</p>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Everything in Operator</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Up to 3 team seats</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Shared ledger view</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Role-based permissions</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Consolidated reporting</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>White-label exports</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Dedicated support access</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Early feature access</li>
+          <li class="has"><span class="feat-check"><div class="feat-check-inner"></div></span>Custom category taxonomy</li>
+        </ul>
+        <a href="/api/checkout?tier=studio" class="pricing-btn">Begin 14-Day Trial →</a>
+      </div>
+
+    </div>
+    <p class="pricing-note">Every 14-day trial includes full <span>Operator-tier features</span> — regardless of which plan you choose · No credit card required · Cancel anytime</p>
+  </div>
+</section>
+
+<!-- ═══ OBJECTION HANDLING ═══ -->
+<section id="objections">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Common Questions</span>
+      <div class="section-title">Before You Decide</div>
+      <div class="section-rule">
+        <div class="section-rule-line"></div><div class="section-rule-dot"></div><div class="section-rule-line r"></div>
+      </div>
+    </div>
+    <div class="objections-grid reveal">
+      <div class="objection-card">
+        <div class="objection-q">Why not just use a spreadsheet?</div>
+        <p class="objection-a">Spreadsheets require your discipline to stay accurate. They don't alert you. They don't calculate runway automatically. They don't detect anomalies. VaultIQ works whether you update it daily or weekly — the intelligence layer is always on.</p>
+      </div>
+      <div class="objection-card">
+        <div class="objection-q">I already pay for QuickBooks. Why switch?</div>
+        <p class="objection-a">QuickBooks is designed for accountants filing taxes — not for operators making daily decisions. VaultIQ is your command view: the number you need the moment you open your laptop. Many clients run both. They're solving different problems.</p>
+      </div>
+      <div class="objection-card">
+        <div class="objection-q">Is my financial data safe?</div>
+        <p class="objection-a">End-to-end encrypted, stored in a secure cloud vault, never sold or shared. Your data is used solely to power your dashboard. We don't analyze it, monetize it, or share it — ever. It's your capital intelligence. Period.</p>
+      </div>
+      <div class="objection-card">
+        <div class="objection-q">What if I don't like it?</div>
+        <p class="objection-a">14 days, no card required. If at any point in that window you decide it's not for you, you walk away — no friction, no retention flows, no cancellation fees. We'd rather earn your business than trap you. That's the VaultIQ standard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ GUARANTEE ═══ -->
+<section id="guarantee">
+  <div class="container">
+    <div class="guarantee-inner reveal">
+      <div class="guarantee-icon"><div class="guarantee-icon-inner"></div></div>
+      <div class="guarantee-title">The Vault Standard</div>
+      <p class="guarantee-text">
+        "If VaultIQ doesn't give you a clearer picture of your capital position within the first 14 days than any tool you're currently using — you walk away free. No questions. No friction. That is the standard we hold ourselves to."
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PHILOSOPHY ═══ -->
+<section id="philosophy">
+  <div class="container">
+    <div class="reveal">
+      <div class="philosophy-quote">
+        "Capital without visibility is not capital.<br/>It is exposure."
+      </div>
+      <div class="philosophy-attr">— The VaultIQ Operator Standard</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FINAL CTA ═══ -->
+<section id="cta">
+  <div class="container">
+    <div class="cta-inner reveal">
+      <span class="cta-eyebrow">Secure Your Position</span>
+      <div class="cta-title">The Vault<br/>Is Open</div>
+      <div class="cta-spots-note"><span class="ann-dot" style="display:inline-block;margin-right:8px;"></span><span id="cta-spots-num">47</span> founding spots remaining at current rate</div>
+      <p class="cta-sub">
+        Join operators who run their finances with the same precision they run their businesses.<br/>
+        14 days free. No card required. Full access from day one.
+      </p>
+      <div class="cta-actions">
+        <a href="#pricing" class="btn-primary btn-primary-lg">
+          <span>Start Free Trial</span>
+          <span style="color:rgba(26,111,212,0.45);font-size:13px;">→</span>
+        </a>
+        <a href="#pricing" class="btn-secondary">View Pricing</a>
+      </div>
+      <p class="cta-fine">No credit card · Cancel anytime · <span>Full Operator access during trial</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST STRIP -->
+<div class="trust-strip">
+  <div class="trust-strip-inner">
+    <div class="trust-item"><span class="trust-item-icon">🔒</span> End-to-end encrypted</div>
+    <div class="trust-item"><span class="trust-item-icon">◎</span> No credit card required</div>
+    <div class="trust-item"><span class="trust-item-icon">✕</span> Cancel anytime</div>
+    <div class="trust-item"><span class="trust-item-icon">⊘</span> Your data is never sold</div>
+    <div class="trust-item"><span class="trust-item-icon">☁</span> Automatic cloud backup</div>
+  </div>
+</div>
+
+<!-- EMAIL CAPTURE -->
+<div class="email-capture">
+  <span class="email-capture-label">Get notified when founding spots run out</span>
+  <div class="email-form">
+    <input type="email" class="email-input" placeholder="your@email.com" />
+    <button class="email-btn" onclick="this.textContent='Saved ✓';this.style.color='var(--green)';this.disabled=true;">Notify Me</button>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo"><img src="TheVaultShield.png" class="footer-logo-shield" alt="" />VAULTIQ</div>
+  <div class="footer-links">
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+    <a href="#">Contact</a>
+    <a href="#">Security</a>
+  </div>
+  <div class="footer-copy">© 2026 VaultIQ. All rights reserved.</div>
+</footer>
+
+</div><!-- /page -->
+
+<!-- ═══ STICKY CTA BAR ═══ -->
+<div class="sticky-cta" id="sticky-cta">
+  <div class="sticky-cta-left">
+    <div class="sticky-cta-brand">
+      <span class="sticky-cta-title">VaultIQ</span>
+      <img src="TheVaultShield.png" class="sticky-cta-logo" alt="VaultIQ" />
+    </div>
+    <div class="sticky-cta-sub">14-day free trial · No card required · Full operator access</div>
+  </div>
+  <div class="sticky-cta-right">
+    <span style="font-size:11px;font-weight:600;letter-spacing:0.06em;color:var(--text-3);font-family:'Inter',sans-serif;" id="sticky-spots">46 spots left</span>
+    <a href="#pricing" class="btn-primary" style="padding:12px 28px;">Start your Free Trial →</a>
+  </div>
+</div>
+
+<!-- ═══ EXIT INTENT OVERLAY ═══ -->
+<div class="exit-overlay" id="exit-overlay">
+  <div class="exit-modal">
+    <button class="exit-close" onclick="closeExit()">✕</button>
+    <span class="exit-eyebrow">Wait — Before You Go</span>
+    <div class="exit-title">Your First 14 Days Are Free</div>
+    <p class="exit-sub">You haven't entered any payment details. There's nothing to lose — and a complete picture of your capital position to gain.</p>
+    <div class="exit-offer">
+      <div class="exit-offer-line"><div class="exit-offer-check"></div>Full Operator-tier dashboard — free for 14 days</div>
+      <div class="exit-offer-line"><div class="exit-offer-check"></div>Runway calculator live from day one</div>
+      <div class="exit-offer-line"><div class="exit-offer-check"></div>Cancel instantly, no questions asked</div>
+      <div class="exit-offer-line"><div class="exit-offer-check"></div>No credit card required to start</div>
+    </div>
+    <a href="/api/checkout?tier=operator" class="btn-primary" style="width:100%;justify-content:center;margin-bottom:16px;" onclick="closeExit()">
+      <span>Enter the Vault — Free for 14 Days</span>
+    </a>
+    <button class="exit-dismiss" onclick="closeExit()">No thanks, I'll figure it out on my own</button>
+  </div>
+</div>
+
+<script>
+
+// ── Scroll Reveal ──
+(function() {
+  const els = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  els.forEach(el => io.observe(el));
+})();
+
+// ── Nav scroll behavior ──
+window.addEventListener('scroll', () => {
+  const nav = document.getElementById('main-nav');
+  if (window.scrollY > 80) nav.classList.add('scrolled');
+  else nav.classList.remove('scrolled');
+
+  // Sticky CTA
+  const sticky = document.getElementById('sticky-cta');
+  const hero = document.getElementById('hero');
+  if (window.scrollY > hero.offsetHeight * 0.7) sticky.classList.add('visible');
+  else sticky.classList.remove('visible');
+});
+
+// ── Coord ticker ──
+(function() {
+  const tl = document.getElementById('coord-tl');
+  if (!tl) return;
+  setInterval(() => {
+    const n = () => String(Math.floor(Math.random()*99)).padStart(2,'0');
+    tl.textContent = n()+'.'+n()+' · '+n()+'.'+n();
+  }, 3000);
+})();
+
+// ── Founding spots counter (social proof scarcity) ──
+let spots = 47;
+function updateSpots() {
+  document.getElementById('spots-count').textContent = spots;
+  document.getElementById('nav-spots').textContent = spots + ' spots left';
+  document.getElementById('urgency-spots').textContent = spots;
+  const el = document.getElementById('sticky-spots');
+  if (el) el.textContent = spots + ' founding spots left';
+  const ctaEl = document.getElementById('cta-spots-num');
+  if (ctaEl) ctaEl.textContent = spots;
+}
+// Decrement slowly and randomly to simulate real activity
+setInterval(() => {
+  if (spots > 12 && Math.random() < 0.3) {
+    spots--;
+    updateSpots();
+  }
+}, 45000);
+
+// ── Annual/Monthly billing toggle ──
+let isAnnual = true; // Annual is default — best value for customers
+const prices = { solo: [29, 23], operator: [79, 63], studio: [149, 119] };
+
+function applyBilling() {
+  const track = document.getElementById('billing-toggle');
+  track.classList.toggle('annual', isAnnual);
+  const monthlyLabel = document.getElementById('toggle-monthly-label');
+  const annualLabel = document.getElementById('toggle-annual-label');
+  if (monthlyLabel) monthlyLabel.style.color = isAnnual ? 'var(--text-dim)' : 'var(--text-bright)';
+  if (annualLabel) annualLabel.style.color = isAnnual ? 'var(--text-bright)' : 'var(--text-dim)';
+
+  const update = (tier, id, noteId) => {
+    const price = isAnnual ? prices[tier][1] : prices[tier][0];
+    const orig = prices[tier][0];
+    document.getElementById(id).textContent = price;
+    const note = document.getElementById(noteId);
+    note.textContent = isAnnual ? `Billed $${price*12}/yr · save $${(orig-price)*12}/yr` : '';
+  };
+  update('solo', 'price-solo', 'note-solo');
+  update('operator', 'price-operator', 'note-operator');
+  update('studio', 'price-studio', 'note-studio');
+}
+
+function toggleBilling() {
+  isAnnual = !isAnnual;
+  applyBilling();
+}
+
+// Initialize annual pricing on load
+document.addEventListener('DOMContentLoaded', applyBilling);
+
+// ── Exit Intent ──
+let exitShown = false;
+document.addEventListener('mouseleave', (e) => {
+  if (e.clientY < 5 && !exitShown && window.scrollY > 300) {
+    exitShown = true;
+    document.getElementById('exit-overlay').classList.add('active');
+  }
+});
+function closeExit() {
+  document.getElementById('exit-overlay').classList.remove('active');
+}
+document.getElementById('exit-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeExit();
+});
+
+// ── Live preview capital counter ──
+(function() {
+  const el = document.getElementById('preview-capital');
+  if (!el) return;
+  let base = 24850;
+  setInterval(() => {
+    base += Math.floor(Math.random() * 200 - 60);
+    el.textContent = '$' + base.toLocaleString();
+  }, 3800);
+})();
+
+// ── Hero-anchored ticker ──
+(function() {
+  const ticker = document.getElementById('bottom-ticker');
+  const hero   = document.getElementById('hero');
+  if (!ticker || !hero) return;
+
+  function update() {
+    // If hero's bottom edge is still below the viewport bottom,
+    // the ticker should appear fixed at screen bottom.
+    // Once hero scrolls away, ticker falls back to absolute (stays at hero bottom).
+    if (hero.getBoundingClientRect().bottom > window.innerHeight) {
+      ticker.classList.add('is-fixed');
+    } else {
+      ticker.classList.remove('is-fixed');
+    }
+  }
+
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update, { passive: true });
+  update();
+})();
+</script>
+
+</body>
+</html>
