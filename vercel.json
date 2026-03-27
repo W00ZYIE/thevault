@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd thevault && npm install && npm run build",
+  "buildCommand": "npm install && cd thevault && npm install && npm run build",
   "outputDirectory": "thevault/dist",
-  "installCommand": "echo 'skip root install'",
+  "installCommand": "echo 'skip'",
   "routes": [
     { "src": "/api/checkout", "dest": "/api/checkout.js" },
     { "src": "/api/stripe-webhook", "dest": "/api/stripe-webhook.js" },
