@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, Area, AreaChart, ReferenceDot,
+  PieChart, Pie, Cell, Tooltip as PieTooltip,
 } from "recharts";
 import AuthView from "./components/AuthView.jsx";
 import { supabase, hasSupabaseConfig } from "./lib/supabaseClient.js";
@@ -10,6 +11,10 @@ import { exportStatement } from "./components/VaultStatementExport";
 import VaultExportButton from "./components/VaultStatementExport";
 import { useTrialState, TrialExpiredWall, TrialBanner } from "./components/VaultTrial"
 import VaultMission from "./components/VaultMission.jsx"
+import VaultInsights from "./components/VaultInsights.jsx";
+import VaultForecast from "./components/VaultForecast.jsx";
+import VaultGoals from "./components/VaultGoals.jsx";
+import VaultCommandPalette from "./components/VaultCommandPalette.jsx";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MONTHS_FULL  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -29,7 +34,7 @@ const CURRENCIES = [
 ];
 
 // ─── Design System ─────────────────────────────────────────────────────────────
-const T = {
+const LIGHT_T = {
   bg:         '#FFFFFF',
   bgSubtle:   '#F7F9FC',
   bgCard:     '#FFFFFF',
@@ -59,6 +64,38 @@ const T = {
   font:       "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
   mono:       "'JetBrains Mono', monospace",
 };
+const DARK_T = {
+  bg:         '#0A0C10',
+  bgSubtle:   '#0F1218',
+  bgCard:     '#141820',
+  sidebar:    '#0C0F14',
+  text1:      '#E8EDF5',
+  text2:      '#9BA8BB',
+  text3:      '#5C6678',
+  text4:      '#3A4454',
+  blue:       '#4B9FEA',
+  blueDark:   '#2E7FCA',
+  blueLight:  'rgba(75,159,234,0.12)',
+  blueFaint:  'rgba(75,159,234,0.06)',
+  gold:       '#F0C060',
+  goldLight:  'rgba(240,192,96,0.12)',
+  green:      '#00D68F',
+  greenLight: 'rgba(0,214,143,0.12)',
+  red:        '#FF6B7A',
+  redLight:   'rgba(255,107,122,0.12)',
+  border:     'rgba(255,255,255,0.06)',
+  borderMid:  'rgba(255,255,255,0.10)',
+  shadow:     '0 2px 16px rgba(0,0,0,0.4)',
+  shadowMd:   '0 4px 32px rgba(0,0,0,0.5)',
+  shadowLg:   '0 8px 64px rgba(0,0,0,0.6)',
+  radius:     '12px',
+  radiusSm:   '8px',
+  radiusLg:   '20px',
+  font:       "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono:       "'JetBrains Mono', monospace",
+};
+// Mutable working copy — reassigned in Vault() before each render so sub-components pick up the correct theme
+let T = { ...LIGHT_T };
 
 // ─── Global CSS ────────────────────────────────────────────────────────────────
 const VAULT_CSS = `
@@ -224,7 +261,7 @@ input[type=number]::-webkit-outer-spin-button { opacity: 0; }
 }
 .v-btn-primary {
   width: 100%; padding: 10px 0;
-  background: #1A6FD4;
+  background: linear-gradient(135deg, #1A6FD4 0%, #1254A8 100%);
   border: none;
   color: #FFFFFF; font-family: 'Inter', sans-serif;
   font-size: 13px; font-weight: 600;
@@ -232,11 +269,14 @@ input[type=number]::-webkit-outer-spin-button { opacity: 0; }
   transition: all 200ms;
   position: relative; overflow: hidden;
   border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(26,111,212,0.25);
 }
 .v-btn-primary::after { display: none; }
 .v-btn-primary:hover {
-  background: #1254A8;
+  background: linear-gradient(135deg, #1254A8 0%, #0e3f85 100%);
   color: #FFFFFF;
+  box-shadow: 0 4px 16px rgba(26,111,212,0.35);
+  transform: translateY(-1px);
 }
 .v-btn-secondary {
   padding: 9px 14px;
@@ -1096,6 +1136,154 @@ input[type=number]::-webkit-outer-spin-button { opacity: 0; }
   /* Mobile toast - higher above nav */
   .v-toast-stack { bottom: 90px; }
 }
+
+/* ── Premium KPI card animations ── */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.v-kpi-premium {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 18px 20px 16px;
+  cursor: default;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  animation: fadeSlideUp 0.35s ease forwards;
+  position: relative;
+  overflow: hidden;
+}
+.v-kpi-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.09);
+}
+.v-kpi-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+.v-grade-badge {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 56px; min-width: 56px; height: 64px;
+  border-radius: 10px; border: 1.5px solid; cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+  font-family: 'Inter', sans-serif;
+}
+.v-grade-badge:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.v-priority-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; border-radius: 8px;
+  background: #F7F9FC; border: 1px solid rgba(0,0,0,0.06);
+  transition: background 150ms;
+}
+.v-priority-item:hover { background: #EBF3FF; }
+.v-milestone-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px; border-radius: 20px;
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
+  border: 1px solid; cursor: pointer;
+  animation: fadeSlideUp 0.4s ease forwards;
+}
+`;
+
+
+// ─── Dark Mode CSS Overrides ───────────────────────────────────────────────────
+const DARK_CSS = `
+html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] #root {
+  background: #0A0C10; color: #9BA8BB;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); }
+html[data-theme="dark"] select option { background: #141820; color: #E8EDF5; }
+html[data-theme="dark"] .v-app { background: #0F1218; }
+html[data-theme="dark"] .v-sidebar { background: #0C0F14; border-right-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-sidebar-logo { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-liq { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-liq-label { color: #3A4454; }
+html[data-theme="dark"] .v-liq-sub { color: #3A4454; }
+html[data-theme="dark"] .v-nav-item { color: #5C6678; }
+html[data-theme="dark"] .v-nav-item:hover { background: #0F1218; color: #9BA8BB; }
+html[data-theme="dark"] .v-nav-item.active { color: #4B9FEA; border-left-color: #4B9FEA; background: rgba(75,159,234,0.12); }
+html[data-theme="dark"] .v-nav-key { color: #3A4454; background: #0F1218; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-nav-item.active .v-nav-key { color: #4B9FEA; background: rgba(75,159,234,0.12); }
+html[data-theme="dark"] .v-btn-primary { background: #4B9FEA; }
+html[data-theme="dark"] .v-btn-primary:hover { background: #2E7FCA; }
+html[data-theme="dark"] .v-btn-secondary { background: #141820; border-color: rgba(255,255,255,0.10); color: #9BA8BB; }
+html[data-theme="dark"] .v-btn-secondary:hover { border-color: rgba(255,255,255,0.20); color: #E8EDF5; }
+html[data-theme="dark"] .v-btn-ghost { color: #5C6678; }
+html[data-theme="dark"] .v-btn-ghost:hover { color: #E8EDF5; }
+html[data-theme="dark"] .v-account { background: #0F1218; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-account-email { color: #5C6678; }
+html[data-theme="dark"] .v-account-signout { color: #3A4454; }
+html[data-theme="dark"] .v-main { background: #0F1218; }
+html[data-theme="dark"] .v-header { background: #0C0F14; border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-header-breadcrumb { color: #3A4454; }
+html[data-theme="dark"] .v-header-title { color: #E8EDF5; }
+html[data-theme="dark"] .v-period-btn { background: #0F1218; border-color: rgba(255,255,255,0.06); color: #5C6678; }
+html[data-theme="dark"] .v-period-btn:hover { color: #4B9FEA; border-color: rgba(75,159,234,0.25); background: rgba(75,159,234,0.12); }
+html[data-theme="dark"] .v-period-label { color: #E8EDF5; }
+html[data-theme="dark"] .v-content { background: #0F1218; }
+html[data-theme="dark"] .v-intel-strip { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-net-hero { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-net-divider { background: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-kpi-card { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-kpi-label { color: #3A4454; }
+html[data-theme="dark"] .v-kpi-sub { color: #3A4454; }
+html[data-theme="dark"] .v-chart-panel { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-proj-tile { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-panel { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-panel-header { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-cal-main { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-cal-month-header { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-cal-day-labels { background: #0F1218; border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-cal-day-label { color: #3A4454; }
+html[data-theme="dark"] .v-cal-day { border-right-color: rgba(255,255,255,0.04); border-bottom-color: rgba(255,255,255,0.04); }
+html[data-theme="dark"] .v-cal-day:hover { background: #0F1218; }
+html[data-theme="dark"] .v-cal-day.selected { background: rgba(75,159,234,0.10); border-color: rgba(75,159,234,0.2); }
+html[data-theme="dark"] .v-cal-day.today { background: rgba(75,159,234,0.08); }
+html[data-theme="dark"] .v-cal-empty { background: #0F1218; border-right-color: rgba(255,255,255,0.03); border-bottom-color: rgba(255,255,255,0.03); }
+html[data-theme="dark"] .v-feed-date-row { background: #0F1218; }
+html[data-theme="dark"] .v-feed-entry { background: #141820; border-bottom-color: rgba(255,255,255,0.04); }
+html[data-theme="dark"] .v-feed-entry:hover { background: #1a2030; }
+html[data-theme="dark"] .v-budget-bar-track { background: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-tag { background: #0F1218; border-color: rgba(255,255,255,0.06); color: #5C6678; }
+html[data-theme="dark"] .v-modal { background: #141820; border-color: rgba(255,255,255,0.08); box-shadow: 0 16px 64px rgba(0,0,0,0.6); }
+html[data-theme="dark"] .v-input { background: #0F1218; border-color: rgba(255,255,255,0.10); color: #E8EDF5; }
+html[data-theme="dark"] .v-field-label { color: #9BA8BB; }
+html[data-theme="dark"] .v-toast { background: #141820; border-color: rgba(255,255,255,0.06); color: #E8EDF5; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+html[data-theme="dark"] .v-settings-tabs { border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-settings-tab { color: #5C6678; }
+html[data-theme="dark"] .v-settings-tab:hover { color: #9BA8BB; background: #0F1218; }
+html[data-theme="dark"] .v-settings-tab.active { color: #4B9FEA; border-bottom-color: #4B9FEA; background: rgba(75,159,234,0.12); }
+html[data-theme="dark"] .v-settings-card { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-filter-chip { background: #0F1218; border-color: rgba(255,255,255,0.06); color: #5C6678; }
+html[data-theme="dark"] .v-filter-chip:hover { color: #9BA8BB; border-color: rgba(255,255,255,0.12); }
+html[data-theme="dark"] .v-filter-chip.active { background: rgba(75,159,234,0.12); color: #4B9FEA; border-color: rgba(75,159,234,0.25); }
+html[data-theme="dark"] .v-type-btn { background: #0F1218; border-color: rgba(255,255,255,0.08); color: #5C6678; }
+html[data-theme="dark"] .v-toggle-wrapper { background: #0F1218; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-scope-btn { background: #0F1218; border-color: rgba(255,255,255,0.08); color: #E8EDF5; }
+html[data-theme="dark"] .v-scope-btn:hover { background: rgba(75,159,234,0.12); }
+html[data-theme="dark"] .v-date-input { background: #0F1218; border-color: rgba(255,255,255,0.10); color: #E8EDF5; }
+html[data-theme="dark"] .v-filter-bar { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-search-input { background: #0F1218; border-color: rgba(255,255,255,0.06); color: #E8EDF5; }
+html[data-theme="dark"] .v-search-clear { color: #3A4454; }
+html[data-theme="dark"] .v-search-clear:hover { color: #E8EDF5; }
+html[data-theme="dark"] .v-search-summary { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-label { color: #3A4454; }
+html[data-theme="dark"] .v-label-hi { color: #5C6678; }
+html[data-theme="dark"] .v-anomaly-badge { background: rgba(255,107,122,0.12); border-color: rgba(255,107,122,0.25); color: #FF6B7A; }
+html[data-theme="dark"] .v-danger-btn { background: rgba(255,107,122,0.12); border-color: rgba(255,107,122,0.25); }
+html[data-theme="dark"] .v-danger-btn:hover { background: rgba(255,107,122,0.20); }
+html[data-theme="dark"] .v-budget-alert { background: rgba(255,107,122,0.08); }
+html[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
+html[data-theme="dark"] .v-mobile-topbar { background: #0C0F14; border-bottom-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-mobile-bottom-nav { background: #0C0F14; border-top-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-mobile-nav-btn { color: #5C6678; }
+html[data-theme="dark"] .v-mobile-nav-btn.active { color: #4B9FEA; }
+html[data-theme="dark"] .v-kpi-premium { background: #141820; border-color: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .v-kpi-premium:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+html[data-theme="dark"] .v-grade-badge { background: #0F1218; border-color: rgba(255,255,255,0.06); }
 `;
 
 // ─── Utilities ─────────────────────────────────────────────────────────────────
@@ -1652,6 +1840,130 @@ function HealthRing({ score }) {
   );
 }
 
+// ─── Sparkline ─────────────────────────────────────────────────────────────────
+function Sparkline({ data = [], color = '#1A6FD4', height = 40, width = 80 }) {
+  if (!data || data.length < 2) return <div style={{ width, height }} />;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const pad = 3;
+  const w = width, h = height;
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={w} height={h} style={{ display:'block', overflow:'visible' }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5}
+        strokeLinecap="round" strokeLinejoin="round" opacity={0.8} />
+      {/* Last point dot */}
+      {data.length > 0 && (() => {
+        const last = data[data.length - 1];
+        const x = pad + ((data.length - 1) / (data.length - 1)) * (w - pad * 2);
+        const y = h - pad - ((last - min) / range) * (h - pad * 2);
+        return <circle cx={x} cy={y} r={2.5} fill={color} />;
+      })()}
+    </svg>
+  );
+}
+
+// ─── Grade helper ──────────────────────────────────────────────────────────────
+function getGrade(type, value, extra = {}) {
+  if (value === null || value === undefined) return { grade:'—', color:'#9CA3AF', bg:'#F7F9FC', border:'rgba(0,0,0,0.1)', tip:'No data yet' };
+  const grades = {
+    incomeGrowth: [
+      { min:10,  grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Income growing strongly' },
+      { min:3,   grade:'A',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Income trending up' },
+      { min:-3,  grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'Income holding steady' },
+      { min:-10, grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'Income slightly declining' },
+      { min:-Infinity, grade:'D', color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Income falling — investigate causes' },
+    ],
+    spendControl: [
+      { min:-Infinity, grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Expenses dropping — excellent discipline', check: v => v <= -5 },
+      { min:-Infinity, grade:'A',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Expenses stable', check: v => v <= 5 },
+      { min:-Infinity, grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'Minor spend increase', check: v => v <= 15 },
+      { min:-Infinity, grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'Spend accelerating — review categories', check: v => v <= 25 },
+      { min:-Infinity, grade:'D',  color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Spend surge — immediate review needed', check: () => true },
+    ],
+    savingsRate: [
+      { min:25, grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Excellent — saving >$1 of every $4' },
+      { min:15, grade:'A',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Strong savings discipline' },
+      { min:5,  grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'Room to improve — target 15%+' },
+      { min:0,  grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'Barely breaking even this month' },
+      { min:-Infinity, grade:'F', color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Spending more than earning — critical' },
+    ],
+    runway: [
+      { min:365, grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'12+ months — highly secure position' },
+      { min:180, grade:'A',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'6–12 months — healthy buffer' },
+      { min:90,  grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'3–6 months — watch spending' },
+      { min:30,  grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'1–3 months — reduce burn urgently' },
+      { min:-Infinity, grade:'F', color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Under 30 days — critical action needed' },
+    ],
+    budgetAdherence: [
+      { min:-Infinity, grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'All budgets under control', check: v => v === 0 },
+      { min:-Infinity, grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'1 category needs attention', check: v => v === 1 },
+      { min:-Infinity, grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'Multiple categories over budget', check: v => v <= 3 },
+      { min:-Infinity, grade:'D',  color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Budget discipline breakdown', check: () => true },
+    ],
+  };
+  const list = grades[type] || [];
+  if (type === 'spendControl' || type === 'budgetAdherence') {
+    return list.find(g => g.check?.(value)) || list[list.length - 1];
+  }
+  return list.find(g => value >= g.min) || list[list.length - 1];
+}
+
+// ─── Priority actions ──────────────────────────────────────────────────────────
+function getPriorityActions({ monthIncome, monthExpenses, savingsRate, runwayDays, catBreakdown, budgetAlerts, momExpensePct, fmt }) {
+  const actions = [];
+  // 1. No income recorded
+  if (monthIncome === 0) {
+    actions.push({ icon:'📥', text:'Record your income to unlock savings rate and runway metrics', impact: null, type:'info' });
+  }
+  // 2. Runway critical
+  if (runwayDays !== null && runwayDays < 90 && monthExpenses > 0) {
+    const topCat = catBreakdown[0];
+    if (topCat) {
+      const cut15 = topCat[1] * 0.15;
+      const daysAdded = monthExpenses > 0 ? Math.round((cut15 / monthExpenses) * 30) : 0;
+      actions.push({ icon:'⚠️', text:`Cut ${topCat[0]} by 15% (${fmt(cut15)}/mo) → adds ${daysAdded} days of runway`, impact: fmt(cut15), type:'warn' });
+    }
+  }
+  // 3. Top category >35% of spend
+  if (catBreakdown.length > 0 && monthExpenses > 0) {
+    const [cat, amt] = catBreakdown[0];
+    const pct = (amt / monthExpenses) * 100;
+    if (pct > 35) {
+      const target = Math.round(monthExpenses * 0.3);
+      actions.push({ icon:'🎯', text:`${cat} is ${pct.toFixed(0)}% of spend — consider capping at ${fmt(target)}/mo`, impact: fmt(amt - target), type:'warn' });
+    }
+  }
+  // 4. Savings rate low
+  if (savingsRate !== null && savingsRate < 10 && monthIncome > 0) {
+    const targetSave = monthIncome * 0.15;
+    const needToCut = monthExpenses - (monthIncome - targetSave);
+    if (needToCut > 0) {
+      actions.push({ icon:'💡', text:`Reduce monthly spend by ${fmt(needToCut)} to reach 15% savings rate`, impact: fmt(needToCut), type:'tip' });
+    }
+  }
+  // 5. Budget alerts
+  const overBudgetCats = budgetAlerts.filter(a => a.over);
+  if (overBudgetCats.length > 0) {
+    actions.push({ icon:'⚡', text:`${overBudgetCats[0].cat} exceeded budget by ${fmt(overBudgetCats[0].spent - overBudgetCats[0].limit)} — review transactions`, impact: null, type:'alert' });
+  }
+  // 6. Spend acceleration
+  if (momExpensePct !== null && momExpensePct > 15 && catBreakdown.length > 0) {
+    const increase = monthExpenses - (monthExpenses / (1 + momExpensePct / 100));
+    actions.push({ icon:'📊', text:`Spend up ${momExpensePct.toFixed(0)}% MoM (+${fmt(increase)}) — identify what changed`, impact: null, type:'info' });
+  }
+  // Default if nothing notable
+  if (actions.length === 0) {
+    actions.push({ icon:'✅', text:'Finances look healthy — keep tracking to maintain this momentum', impact: null, type:'good' });
+  }
+  return actions.slice(0, 3);
+}
+
 // ─── Toast Stack ───────────────────────────────────────────────────────────────
 function ToastStack({ toasts, remove }) {
   if (!toasts.length) return null;
@@ -1686,6 +1998,14 @@ const NavIcons = {
 
 // ─── Main App ──────────────────────────────────────────────────────────────────
 export default function Vault() {
+  // ─── Theme ────────────────────────────────────────────────────────────────
+  const [theme, setTheme] = useState(() => localStorage.getItem('vault_theme') || 'light');
+  // Mutate module-level T so all sub-components (defined outside this fn) get the correct theme colors
+  Object.assign(T, theme === 'dark' ? DARK_T : LIGHT_T);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
   const [session,      setSession]      = useState(null);
   const [user,         setUser]         = useState(null);
   const [authReady,    setAuthReady]    = useState(false);
@@ -1714,6 +2034,14 @@ export default function Vault() {
   const [settingsTab,   setSettingsTab]   = useState("data");
   const [showProjected, setShowProjected] = useState(false);
   const [accountEmail,  setAccountEmail]  = useState("");
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [notifications, setNotifications]           = useState([]);
+  const [showNotifications, setShowNotifications]   = useState(false);
+  const [notifRead, setNotifRead]                   = useState(true);
+  const [goals, setGoals] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("vault:goals") || "[]"); } catch { return []; }
+  });
+  useEffect(() => { try { localStorage.setItem("vault:goals", JSON.stringify(goals)); } catch {} }, [goals]);
 
   const { toasts, add:addToast, remove:removeToast } = useToast();
   const { fmt, fSign } = useMemo(() => makeFmt("USD"), []);
@@ -1722,12 +2050,19 @@ export default function Vault() {
   useEffect(() => {
     let mounted = true;
     if (!hasSupabaseConfig || !supabase) { setAuthReady(true); return () => { mounted = false; }; }
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data?.session ?? null);
-      setUser(data?.session?.user ?? null);
-      setAuthReady(true);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setSession(data?.session ?? null);
+        setUser(data?.session?.user ?? null);
+        setAuthReady(true);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setSession(null);
+        setUser(null);
+        setAuthReady(true);
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!mounted) return;
       setSession(next ?? null);
@@ -1770,7 +2105,18 @@ export default function Vault() {
         setForm(blankForm({ expense:[...DEFAULT_CATS.expense,...(d.customCats.expense||[])], income:[...DEFAULT_CATS.income,...(d.customCats.income||[])] }));
       } catch (e) {
         console.error("[Vault]", e);
-        if (!disposed) addToast("Sync failed. Using local data.", "err");
+        if (!disposed) {
+          addToast("Sync failed. Using local data.", "err");
+          // Fallback: load local data so the form is always initialized
+          try {
+            const fallback = await loadLocalData();
+            setTxs(fallback.txs); setBaseLiq(fallback.baseLiquidity);
+            setBudgets(fallback.budgets); setCustomCats(fallback.customCats);
+            setForm(blankForm({ expense:[...DEFAULT_CATS.expense,...(fallback.customCats.expense||[])], income:[...DEFAULT_CATS.income,...(fallback.customCats.income||[])] }));
+          } catch {
+            setForm(blankForm({ expense:DEFAULT_CATS.expense, income:DEFAULT_CATS.income }));
+          }
+        }
       } finally {
         if (!disposed) setLoaded(true);
       }
@@ -1793,6 +2139,11 @@ export default function Vault() {
 
   useEffect(() => {
     const h = e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(s => !s);
+        return;
+      }
       if (modal || scopeAction) return;
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (["input","textarea","select"].includes(tag)) return;
@@ -1900,6 +2251,89 @@ export default function Vault() {
     if (!budgetAlerts.some(a => a.over)) s += 5;
     return Math.max(0, Math.min(100, Math.round(s)));
   }, [liquidity, monthIncome, monthExpenses, runwayDisplay, budgetAlerts]);
+
+  // ── Daily burn rate ──
+  const dailyBurn = useMemo(() => {
+    const days = daysInMonth(period.y, period.m);
+    return days > 0 ? monthExpenses / days : 0;
+  }, [monthExpenses, period]);
+
+  // ── 6-month sparkline data arrays ──
+  const sparklineData = useMemo(() => {
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const offset = 5 - i;
+      let m = period.m - offset; let y = period.y;
+      while (m < 0) { m += 12; y--; }
+      const mTxs = txsForMonth(txs, y, m);
+      return {
+        income:   mTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),
+        expenses: mTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),
+        net:      mTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0) - mTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),
+        savings:  (() => { const inc = mTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0); const exp = mTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0); return inc>0?(inc-exp)/inc*100:0; })(),
+      };
+    });
+    return {
+      income:   months.map(m=>m.income),
+      expenses: months.map(m=>m.expenses),
+      net:      months.map(m=>m.net),
+      savings:  months.map(m=>m.savings),
+    };
+  }, [txs, period]);
+
+  // ── Financial velocity (net trend vs 3 months ago) ──
+  const financialVelocity = useMemo(() => {
+    const currentNet = monthIncome - monthExpenses;
+    let m3 = period.m - 3; let y3 = period.y;
+    while (m3 < 0) { m3 += 12; y3--; }
+    const pastTxs = txsForMonth(txs, y3, m3);
+    const pastNet = pastTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0)
+                  - pastTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+    const delta = currentNet - pastNet;
+    const pct = pastNet !== 0 ? (delta / Math.abs(pastNet)) * 100 : null;
+    return { delta, pct, improving: delta > 0 };
+  }, [txs, period, monthIncome, monthExpenses]);
+
+  // ── Runway in days (for grades/priorities) ──
+  const runwayDaysNum = useMemo(() => {
+    if (monthExpenses <= 0 || liquidity <= 0) return null;
+    return Math.round((liquidity / monthExpenses) * 30.4375);
+  }, [liquidity, monthExpenses]);
+
+  // ── Report card grades ──
+  const reportCard = useMemo(() => {
+    const ig = getGrade('incomeGrowth',   momIncomePct);
+    const sc = getGrade('spendControl',   momExpensePct);
+    const sr = getGrade('savingsRate',    savingsRate);
+    const rw = getGrade('runway',         runwayDaysNum);
+    const ba = getGrade('budgetAdherence', budgetAlerts.filter(a=>a.over).length);
+    const gradeToGpa = { 'A+':4.3,'A':4,'B':3,'C':2,'D':1,'F':0,'—':null };
+    const gpas = [ig,sc,sr,rw,ba].map(g=>gradeToGpa[g.grade]).filter(v=>v!==null);
+    const avgGpa = gpas.length ? gpas.reduce((a,b)=>a+b,0)/gpas.length : null;
+    const overallGrade = avgGpa === null ? '—' : avgGpa >= 4 ? 'A' : avgGpa >= 3 ? 'B' : avgGpa >= 2 ? 'C' : avgGpa >= 1 ? 'D' : 'F';
+    return { incomeGrowth:ig, spendControl:sc, savingsRate:sr, runway:rw, budgetAdherence:ba, overallGrade };
+  }, [momIncomePct, momExpensePct, savingsRate, runwayDaysNum, budgetAlerts]);
+
+  // ── Priority actions ──
+  const priorityActions = useMemo(() =>
+    getPriorityActions({ monthIncome, monthExpenses, savingsRate, runwayDays:runwayDaysNum, catBreakdown, budgetAlerts, momExpensePct, fmt }),
+    [monthIncome, monthExpenses, savingsRate, runwayDaysNum, catBreakdown, budgetAlerts, momExpensePct, fmt]);
+
+  // ── Milestone badges ──
+  const [dismissedBadges, setDismissedBadges] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('vault:badges') || '[]')); } catch { return new Set(); }
+  });
+  const earnedBadges = useMemo(() => {
+    const badges = [];
+    if (txs.length >= 1)           badges.push({ id:'first-tx',      icon:'🏦', label:'First Transaction', color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)' });
+    if (monthIncome > monthExpenses && monthExpenses > 0) badges.push({ id:'profitable',   icon:'📈', label:'Profitable Month',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)' });
+    if (runwayDaysNum !== null && runwayDaysNum >= 180)   badges.push({ id:'runway-6mo',   icon:'🚀', label:'6 Months Runway',   color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)' });
+    else if (runwayDaysNum !== null && runwayDaysNum >= 90) badges.push({ id:'runway-3mo', icon:'🛡️', label:'3 Months Runway',   color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)' });
+    if (liquidity >= 10000)        badges.push({ id:'10k-capital',   icon:'💰', label:'$10k Capital',       color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)' });
+    if (!budgetAlerts.some(a=>a.over) && Object.keys(budgets).length >= 2) badges.push({ id:'budget-clean', icon:'🎯', label:'Budget Discipline', color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)' });
+    return badges.filter(b => !dismissedBadges.has(b.id));
+  }, [txs, monthIncome, monthExpenses, runwayDaysNum, liquidity, budgetAlerts, budgets, dismissedBadges]);
+
+  const [expandedGrade, setExpandedGrade] = useState(null);
 
   const calMap = useMemo(() => {
     const m = {};
@@ -2159,11 +2593,13 @@ export default function Vault() {
   };
 
   const navItems = [
-    ["overview","Overview","O"],
-    ["calendar","Calendar","C"],
-    ["ledger","Ledger","L"],
-    ["settings","Settings",""],
-    ["mission","Mission","M"],
+    ["overview",  "Overview",  "O"],
+    ["calendar",  "Calendar",  "C"],
+    ["ledger",    "Ledger",    "L"],
+    ["forecast",  "Forecast",  null],
+    ["goals",     "Goals",     null],
+    ["settings",  "Settings",  ""],
+    ["mission",   "Mission",   "M"],
   ];
 
   const anomalyDots = anomalies.filter(a => a.type === "spike").map(a => ({ ...a }));
@@ -2171,6 +2607,7 @@ export default function Vault() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: VAULT_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: DARK_CSS }} />
 
       <div className="v-app">
 
@@ -2178,8 +2615,8 @@ export default function Vault() {
         <aside className="v-sidebar">
           <div className="v-sidebar-logo">
             <img src="/TheVaultShield.png" style={{ width:26, height:26, objectFit:'contain' }} alt="" />
-            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:15, fontWeight:800, letterSpacing:'-0.02em', color:'#0A0C10', marginLeft:8 }}>
-              VAULT<span style={{ color:'#1A6FD4' }}>IQ</span>
+            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:15, fontWeight:800, letterSpacing:'-0.02em', color:T.text1, marginLeft:8 }}>
+              VAULT<span style={{ color:T.blue }}>IQ</span>
             </span>
           </div>
 
@@ -2287,10 +2724,10 @@ export default function Vault() {
         <div className="v-main">
           <header className="v-header">
             <div>
-              <div className="v-header-breadcrumb">VAULT / {view.toUpperCase()}</div>
+              <div className="v-header-breadcrumb">{{ overview:"VAULT / OVERVIEW", calendar:"VAULT / CALENDAR", ledger:"VAULT / LEDGER", settings:"VAULT / SETTINGS", mission:"VAULT / MISSION", forecast:"VAULT / FORECAST", goals:"VAULT / GOALS" }[view] ?? `VAULT / ${view.toUpperCase()}`}</div>
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                 <div className="v-header-title">
-                  {{ overview:"Command Overview", calendar:"Transaction Calendar", ledger:"Transaction Ledger", settings:"System Configuration", mission:"Launch Mission" }[view]}
+                  {{ overview:"Command Overview", calendar:"Transaction Calendar", ledger:"Transaction Ledger", settings:"System Configuration", mission:"Launch Mission", forecast:"Cash Flow Forecast", goals:"Financial Goals" }[view]}
                 </div>
                 {view === "overview" && momIncomePct !== null && (
                   <TrendPill pct={momIncomePct} />
@@ -2305,6 +2742,71 @@ export default function Vault() {
                   <button className="v-period-btn" onClick={goNext}>›</button>
                 </div>
               )}
+              {/* Theme toggle */}
+              <button
+                onClick={() => setTheme(t => {
+                  const next = t === 'dark' ? 'light' : 'dark';
+                  localStorage.setItem('vault_theme', next);
+                  return next;
+                })}
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:T.radiusSm,
+                  cursor:'pointer', padding:'7px 9px', display:'flex', alignItems:'center',
+                  color:T.text3, transition:'all 200ms ease', flexShrink:0 }}
+              >
+                {theme === 'dark' ? (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                  </svg>
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                  </svg>
+                )}
+              </button>
+
+              <div style={{ position:'relative' }}>
+                <button onClick={() => { setShowNotifications(s=>!s); setNotifRead(true); }}
+                  style={{ background:'transparent', border:`1px solid ${T.border}`, borderRadius:8,
+                    padding:'8px 12px', cursor:'pointer', fontSize:16, color:T.text3,
+                    display:'flex', alignItems:'center', gap:6, position:'relative' }}>
+                  🔔
+                  {!notifRead && budgetAlerts.length > 0 && (
+                    <span style={{ position:'absolute', top:4, right:4, width:8, height:8,
+                      borderRadius:'50%', background:'#E53935', border:'2px solid white' }} />
+                  )}
+                </button>
+                {showNotifications && (
+                  <div style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:320,
+                    background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12,
+                    boxShadow:T.shadowLg, zIndex:200, overflow:'hidden' }}>
+                    <div style={{ padding:'14px 16px', borderBottom:`1px solid ${T.border}`,
+                      fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:700,
+                      letterSpacing:'0.06em', textTransform:'uppercase', color:T.text4 }}>Alerts</div>
+                    <div style={{ maxHeight:280, overflowY:'auto' }}>
+                      {budgetAlerts.length === 0 && (
+                        <div style={{ padding:'20px 16px', fontFamily:"'Inter',sans-serif", fontSize:13, color:T.text4, textAlign:'center' }}>No active alerts</div>
+                      )}
+                      {budgetAlerts.map((a, i) => (
+                        <div key={i} style={{ padding:'12px 16px', borderBottom:`1px solid ${T.border}`,
+                          display:'flex', gap:10, alignItems:'flex-start' }}>
+                          <span style={{ fontSize:14, flexShrink:0, marginTop:1 }}>{a.over ? '🔴' : '🟡'}</span>
+                          <div style={{ fontFamily:"'Inter',sans-serif" }}>
+                            <div style={{ fontSize:13, fontWeight:600, color:T.text1 }}>{a.cat}</div>
+                            <div style={{ fontSize:11, color:T.text4, marginTop:2 }}>
+                              ${a.spent.toLocaleString('en-US',{maximumFractionDigits:0})} of ${a.limit.toLocaleString('en-US',{maximumFractionDigits:0})} budget
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <button onClick={openAdd} className="v-btn-primary" style={{ width:"auto", padding:"9px 20px", fontSize:13, letterSpacing:0, fontWeight:600 }}>
                 + New
               </button>
@@ -2314,7 +2816,7 @@ export default function Vault() {
           <main className="v-content">
             <div
               className={
-                view === "calendar" || view === "overview" || view === "ledger" || view === "settings" || view === "mission"
+                view === "calendar" || view === "overview" || view === "ledger" || view === "settings" || view === "mission" || view === "forecast" || view === "goals"
                   ? "v-content-inner v-content-inner--wide"
                   : "v-content-inner"
               }
@@ -2324,11 +2826,11 @@ export default function Vault() {
             {view === "overview" && (
               <div style={{ padding:"20px 24px 60px" }}>
 
-                {/* ── Status bar ── */}
+                {/* ── Intelligence bar ── */}
                 <div style={{
                   display:"flex", alignItems:"center", gap:14, flexWrap:"wrap",
                   marginBottom:16, padding:"10px 18px",
-                  background:"#fff", border:"1px solid rgba(0,0,0,0.08)", borderRadius:12,
+                  background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12,
                 }}>
                   {intelMsgs.map((msg, i) => (
                     <div key={i} style={{ display:"flex", alignItems:"center", gap:7 }}>
@@ -2346,105 +2848,175 @@ export default function Vault() {
                   </span>
                 </div>
 
-                {/* ── HERO: Net Position ── */}
-                <div style={{
-                  background:"#fff", border:"1px solid rgba(0,0,0,0.08)", borderRadius:16,
-                  padding:"28px 32px 24px", marginBottom:12, position:"relative", overflow:"hidden",
-                }}>
-                  {/* Subtle accent strip at top */}
-                  <div style={{
-                    position:"absolute", top:0, left:0, right:0, height:3,
-                    background: monthNet >= 0
-                      ? "linear-gradient(90deg, #00B876 0%, rgba(0,184,118,0.2) 100%)"
-                      : "linear-gradient(90deg, #E53935 0%, rgba(229,57,53,0.2) 100%)",
-                  }} />
-
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:24, alignItems:"start", flexWrap:"wrap" }}>
-                    {/* Left: main value + meta */}
-                    <div>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.10em", textTransform:"uppercase", color:T.text4, marginBottom:12 }}>
-                        Net Position · {MONTHS_FULL[period.m]} {period.y}
-                      </div>
-                      <div style={{
-                        fontFamily:"'Inter',sans-serif", fontSize:58, fontWeight:800,
-                        letterSpacing:"-0.05em", lineHeight:1,
-                        color: monthNet >= 0 ? T.green : T.red,
-                        transition:"color 0.5s",
-                      }}>
-                        {monthNet >= 0 ? "+" : "−"}{fmt(Math.abs(monthNet))}
-                      </div>
-                      <div style={{ marginTop:12, display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:monthNet>=0?"rgba(0,184,118,0.7)":"rgba(229,57,53,0.7)", letterSpacing:"0.06em" }}>
-                          {monthNet >= 0 ? "▲ Positive cycle" : "▼ Deficit cycle"}
-                        </span>
-                        {overBudget && <span className="v-anomaly-badge">BUDGET EXCEEDED</span>}
-                        {!overBudget && budgetAlerts.length > 0 && (
-                          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, letterSpacing:"0.16em", color:T.gold, border:`1px solid rgba(232,160,32,0.3)`, padding:"2px 7px", borderRadius:3 }}>BUDGET ALERT</span>
-                        )}
-                      </div>
+                {/* ── 5 Premium KPI Cards ── */}
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10, marginBottom:12 }}>
+                  {/* Net Position */}
+                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${monthNet>=0?T.green:T.red}`, animationDelay:'0ms' }}>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Net Position</div>
+                    <div className="v-kpi-number" style={{ color: monthNet>=0?T.green:T.red, marginBottom:4 }}>
+                      {monthNet>=0?"+":"-"}{fmt(Math.abs(monthNet))}
                     </div>
-                    {/* Right: health ring */}
-                    <HealthRing score={healthScore} />
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                      <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3 }}>
+                        {monthNet>=0 ? "Positive cycle" : "Deficit cycle"}
+                      </span>
+                    </div>
+                    <Sparkline data={sparklineData.net} color={monthNet>=0?T.green:T.red} width={80} height={32} />
                   </div>
 
-                  {/* Sub-row: 4 metrics */}
-                  <div style={{ marginTop:24, paddingTop:20, borderTop:"1px solid rgba(0,0,0,0.07)", display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0 }}>
-                    {[
-                      {
-                        label:"Monthly Income", value:fmt(monthIncome),
-                        color:valueSignColor(monthIncome),
-                        sub:`${monthTxs.filter(t=>t.type==="income").length} entries`,
-                        trend: momIncomePct,
-                      },
-                      {
-                        label:"Burn Rate", value:fmt(monthExpenses),
-                        color:T.red,
-                        sub:`${monthTxs.filter(t=>t.type==="expense").length} entries`,
-                        trend: momExpensePct, invertTrend:true,
-                      },
-                      {
-                        label:"Savings Rate",
-                        value: savingsRate !== null ? `${savingsRate.toFixed(1)}%` : "—",
-                        color: savingsRate === null ? T.text3 : savingsRate >= 20 ? T.green : savingsRate >= 0 ? T.gold : T.red,
-                        sub:"of gross income",
-                        trend: null,
-                      },
-                      {
-                        label:"Runway",
-                        value: runwayDisplay?.primary ?? "—",
-                        color: runwayDisplay ? T.gold : T.text3,
-                        sub: runwayDisplay?.secondary ?? "Insufficient data",
-                        trend: null,
-                      },
-                    ].map(({ label, value, color, sub, trend, invertTrend }, i) => (
-                      <div key={label} style={{
-                        padding:"16px 20px",
-                        borderLeft: i > 0 ? "1px solid rgba(0,0,0,0.07)" : "none",
-                      }}>
-                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>{label}</div>
-                        <div style={{ display:"flex", alignItems:"baseline", gap:8, marginBottom:4 }}>
-                          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:20, fontWeight:500, letterSpacing:"-0.04em", color }}>{value}</span>
-                          {trend !== null && <TrendPill pct={trend} invert={invertTrend} />}
+                  {/* Daily Burn */}
+                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${T.red}`, animationDelay:'60ms' }}>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Daily Burn</div>
+                    <div className="v-kpi-number" style={{ color:T.red, marginBottom:4 }}>
+                      {dailyBurn > 0 ? `${fmt(dailyBurn)}/day` : "—"}
+                    </div>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3, marginBottom:6 }}>
+                      {dailyBurn > 0 ? `${fmt(dailyBurn * 30.4375)}/mo pace` : "No expenses yet"}
+                    </div>
+                    <Sparkline data={sparklineData.expenses} color={T.red} width={80} height={32} />
+                  </div>
+
+                  {/* Savings Rate */}
+                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${T.blue}`, animationDelay:'120ms' }}>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Savings Rate</div>
+                    <div className="v-kpi-number" style={{ color: savingsRate===null?T.text3:savingsRate>=20?T.green:savingsRate>=0?T.gold:T.red, marginBottom:4 }}>
+                      {savingsRate !== null ? `${savingsRate.toFixed(1)}%` : "—"}
+                    </div>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3, marginBottom:6 }}>
+                      {savingsRate !== null ? (savingsRate>=20?"Strong discipline":savingsRate>=0?"Room to improve":"Spending > earning") : "Add income to track"}
+                    </div>
+                    <Sparkline data={sparklineData.savings} color={T.blue} width={80} height={32} />
+                  </div>
+
+                  {/* Runway */}
+                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${T.gold}`, animationDelay:'180ms' }}>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Runway</div>
+                    <div className="v-kpi-number" style={{ color: runwayDisplay?T.gold:T.text3, marginBottom:4 }}>
+                      {runwayDisplay?.primary ?? "—"}
+                    </div>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3, marginBottom:6 }}>
+                      {runwayDisplay?.secondary ?? "Insufficient data"}
+                    </div>
+                    {runwayDaysNum !== null && (
+                      <div style={{ height:4, background:"rgba(0,0,0,0.06)", borderRadius:2, overflow:"hidden" }}>
+                        <div style={{ height:"100%", width:`${Math.min(100, (runwayDaysNum/365)*100)}%`, background:runwayDaysNum>=180?T.green:runwayDaysNum>=90?T.gold:T.red, borderRadius:2, transition:"width 0.8s ease" }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Health Score */}
+                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${healthScore>=70?T.green:healthScore>=45?T.gold:T.red}`, animationDelay:'240ms' }}>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Health Score</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
+                      <div style={{ position:"relative", width:44, height:44, flexShrink:0 }}>
+                        <svg width={44} height={44} style={{ transform:"rotate(-90deg)", display:"block" }}>
+                          <circle cx={22} cy={22} r={18} fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={4} />
+                          <circle cx={22} cy={22} r={18} fill="none" stroke={healthScore>=70?T.green:healthScore>=45?T.gold:T.red} strokeWidth={4}
+                            strokeDasharray={`${(healthScore/100)*2*Math.PI*18} ${2*Math.PI*18}`} strokeLinecap="round" style={{ transition:"stroke-dasharray 1.2s cubic-bezier(0.16,1,0.3,1)" }} />
+                        </svg>
+                        <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, fontWeight:600, color:healthScore>=70?T.green:healthScore>=45?T.gold:T.red }}>{healthScore}</span>
                         </div>
-                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text4 }}>{sub}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:700, color:healthScore>=70?T.green:healthScore>=45?T.gold:T.red }}>
+                          {healthScore>=70?"Strong":healthScore>=45?"Stable":"At Risk"}
+                        </div>
+                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3 }}>{healthScore}/100</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Financial Report Card ── */}
+                <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:12 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+                    {/* GPA */}
+                    <div style={{ textAlign:"center", padding:"0 16px 0 0", borderRight:"1px solid rgba(0,0,0,0.08)" }}>
+                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:4 }}>Overall</div>
+                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:28, fontWeight:800, letterSpacing:"-0.03em",
+                        color: reportCard.overallGrade==='A'||reportCard.overallGrade==='A+'?T.green : reportCard.overallGrade==='B'?T.blue : reportCard.overallGrade==='C'?T.gold : T.red }}>
+                        {reportCard.overallGrade}
+                      </div>
+                    </div>
+                    {/* 5 grades */}
+                    <div style={{ display:"flex", gap:8, flex:1, flexWrap:"wrap" }}>
+                      {[
+                        { key:"incomeGrowth", label:"Income Growth" },
+                        { key:"spendControl", label:"Spend Control" },
+                        { key:"savingsRate",  label:"Savings Rate" },
+                        { key:"runway",       label:"Runway" },
+                        { key:"budgetAdherence", label:"Budget" },
+                      ].map(({ key, label }) => {
+                        const g = reportCard[key];
+                        const isOpen = expandedGrade === key;
+                        return (
+                          <div key={key} style={{ position:"relative" }}>
+                            <div className="v-grade-badge" onClick={() => setExpandedGrade(isOpen ? null : key)}
+                              style={{ borderColor: g.border, background: g.bg }}>
+                              <span style={{ fontFamily:"'Inter',sans-serif", fontSize:16, fontWeight:800, color:g.color }}>{g.grade}</span>
+                              <span style={{ fontFamily:"'Inter',sans-serif", fontSize:8, fontWeight:600, color:g.color, textAlign:"center", lineHeight:1.2, marginTop:1 }}>{label}</span>
+                            </div>
+                            {isOpen && (
+                              <div style={{ position:"absolute", top:"calc(100% + 8px)", left:"50%", transform:"translateX(-50%)", zIndex:20,
+                                background:T.bgCard, border:`1px solid ${T.borderMid}`, borderRadius:10, padding:"12px 14px",
+                                boxShadow:T.shadowLg, minWidth:200, maxWidth:260 }}>
+                                <div style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:T.text1, marginBottom:4 }}>{label}: {g.grade}</div>
+                                <div style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:T.text2, lineHeight:1.5 }}>{g.tip}</div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Break-even status */}
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", color:T.text4, marginBottom:3 }}>This Month</div>
+                      <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, fontWeight:600, color:breakEvenGap>0?T.gold:T.green }}>
+                        {breakEvenGap>0 ? `${fmt(breakEvenGap)} to break-even` : "Break-even achieved ✓"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Priority Actions ── */}
+                <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:12 }}>
+                  <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:12 }}>
+                    This Month's Priorities
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {priorityActions.map((a, i) => (
+                      <div key={i} className="v-priority-item">
+                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:16, flexShrink:0, lineHeight:1 }}>{a.icon}</div>
+                        <div style={{ flex:1 }}>
+                          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:500, color:T.text1 }}>{a.text}</span>
+                        </div>
+                        {a.impact && (
+                          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, fontWeight:600, color:T.green, flexShrink:0, background:T.greenLight, padding:"2px 8px", borderRadius:6 }}>
+                            save {a.impact}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-
-                  {/* Recovery + next-month toggle */}
-                  <div style={{ marginTop:16, paddingTop:14, borderTop:"1px solid rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
-                    <div>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", color:T.text4, marginBottom:4 }}>Recovery Target</div>
-                      <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, fontWeight:500, color:breakEvenGap>0?T.gold:T.green, letterSpacing:"-0.02em" }}>
-                        {breakEvenGap > 0 ? `${fmt(breakEvenGap)} to break-even` : "Break-even achieved ✓"}
-                      </div>
-                    </div>
-                    <div style={{ flex:1 }} />
-                    <button onClick={()=>setShowProjected(p=>!p)} className="v-btn-secondary" style={{ fontSize:10, letterSpacing:"0.12em", padding:"7px 16px" }}>
-                      {showProjected ? "▲ Hide Forecast" : "▼ Show Forecast"}
-                    </button>
-                  </div>
                 </div>
+
+                {/* ── Milestone badges ── */}
+                {earnedBadges.length > 0 && (
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:12 }}>
+                    {earnedBadges.map(b => (
+                      <div key={b.id} className="v-milestone-badge" style={{ background:b.bg, borderColor:b.border, color:b.color }}>
+                        <span>{b.icon}</span>
+                        <span>{b.label}</span>
+                        <button onClick={() => {
+                          const next = new Set(dismissedBadges); next.add(b.id);
+                          setDismissedBadges(next);
+                          try { localStorage.setItem('vault:badges', JSON.stringify([...next])); } catch {}
+                        }} style={{ background:"none", border:"none", cursor:"pointer", color:b.color, fontSize:12, padding:0, lineHeight:1, opacity:0.6, marginLeft:2 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* ── Forecast row ── */}
                 {showProjected && (
@@ -2454,7 +3026,7 @@ export default function Vault() {
                       { label:`Projected Burn · ${MONTHS_SHORT[(period.m+1)%12]}`,   value:fmt(projectedNext.expense), color:T.red },
                       { label:`Projected Net · ${MONTHS_SHORT[(period.m+1)%12]}`,    value:fSign(projectedNext.income-projectedNext.expense), color:projectedNext.income-projectedNext.expense>=0?T.green:T.red },
                     ].map(({ label, value, color }) => (
-                      <div key={label} style={{ background:"#fff", border:"1px solid rgba(0,0,0,0.08)", borderRadius:12, padding:"18px 22px" }}>
+                      <div key={label} style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"18px 22px" }}>
                         <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:12 }}>{label}</div>
                         <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:22, fontWeight:500, color, letterSpacing:"-0.04em" }}>{value}</div>
                       </div>
@@ -2462,8 +3034,9 @@ export default function Vault() {
                   </div>
                 )}
 
+
                 {/* ── Chart Panel ── */}
-                <div style={{ background:"#fff", border:"1px solid rgba(0,0,0,0.08)", borderRadius:16, marginBottom:12 }}>
+                <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:16, marginBottom:12 }}>
                   <div style={{ padding:"20px 24px 0", display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
                     <div>
                       <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:5 }}>
@@ -2529,11 +3102,41 @@ export default function Vault() {
                   </div>
                 </div>
 
-                {/* ── Bottom split: Burn Breakdown + Recent Activity ── */}
+                {/* ── Category Donut Chart ── */}
+                {catBreakdown && catBreakdown.length > 0 && (
+                  <div style={{ background:'#FFFFFF', border:'1px solid rgba(0,0,0,0.08)', borderRadius:12, padding:'20px 22px', marginTop:12 }}>
+                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color:'#9CA3AF', marginBottom:12 }}>Spend Breakdown</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:24 }}>
+                      <ResponsiveContainer width={140} height={140}>
+                        <PieChart>
+                          <Pie data={catBreakdown.slice(0,5).map(c=>({name:c[0],value:c[1]}))}
+                            cx="50%" cy="50%" innerRadius={40} outerRadius={65}
+                            paddingAngle={2} dataKey="value">
+                            {catBreakdown.slice(0,5).map((_, i) => (
+                              <Cell key={i} fill={['#E53935','#E8A020','#1A6FD4','#00B876','#6B7280'][i]} />
+                            ))}
+                          </Pie>
+                          <PieTooltip formatter={(v) => ['$'+v.toLocaleString('en-US',{maximumFractionDigits:0}), '']} contentStyle={{ fontFamily:"'Inter',sans-serif", fontSize:12, borderRadius:8, border:'1px solid rgba(0,0,0,0.08)' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6 }}>
+                        {catBreakdown.slice(0,5).map((c, i) => (
+                          <div key={c[0]} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <div style={{ width:10, height:10, borderRadius:2, flexShrink:0, background:['#E53935','#E8A020','#1A6FD4','#00B876','#6B7280'][i] }} />
+                            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#3D4452', flex:1 }}>{c[0]}</span>
+                            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, fontWeight:500, color:'#0A0C10' }}>${c[1].toLocaleString('en-US',{maximumFractionDigits:0})}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Bottom split: Burn Breakdown + VaultInsights ── */}
                 <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1fr) minmax(0,1.65fr)", gap:12 }}>
                   {/* Burn Breakdown */}
-                  <div style={{ background:"#fff", border:"1px solid rgba(0,0,0,0.08)", borderRadius:16, overflow:"hidden" }}>
-                    <div style={{ padding:"18px 22px 14px", borderBottom:"1px solid rgba(0,0,0,0.06)" }}>
+                  <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:16, overflow:"hidden" }}>
+                    <div style={{ padding:"18px 22px 14px", borderBottom:`1px solid ${T.border}` }}>
                       <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:3 }}>Burn Breakdown</div>
                       <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text4 }}>{MONTHS_FULL[period.m]} {period.y}</div>
                     </div>
@@ -2560,22 +3163,83 @@ export default function Vault() {
                     </div>
                   </div>
 
-                  {/* Recent Activity */}
-                  <div style={{ background:"#fff", border:"1px solid rgba(0,0,0,0.08)", borderRadius:16, overflow:"hidden", minWidth:0 }}>
-                    <div style={{ padding:"18px 22px 14px", borderBottom:"1px solid rgba(0,0,0,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <div>
-                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:3 }}>Recent Activity</div>
-                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text4 }}>Last 2 active days</div>
+                  {/* VaultInsights */}
+                  <VaultInsights
+                    monthIncome={monthIncome}
+                    monthExpenses={monthExpenses}
+                    momIncomePct={momIncomePct}
+                    momExpensePct={momExpensePct}
+                    savingsRate={savingsRate}
+                    runwayDays={monthExpenses > 0 && liquidity > 0 ? Math.round(liquidity / monthExpenses * 30.4375) : null}
+                    budgetAlerts={budgetAlerts}
+                    anomalies={anomalies}
+                    catBreakdown={catBreakdown}
+                    intelMsgs={intelMsgs}
+                  />
+                </div>
+
+                {/* ── Subscription Tracker ── */}
+                {(() => {
+                  const subs = txs.filter(t => t.recurring && !t.isRecurringInstance && t.type === 'expense');
+                  if (subs.length === 0) return null;
+                  const monthlyTotal = subs.reduce((s,t) => s + (t.recurringFreq==='weekly' ? t.amount*4.33 : t.amount), 0);
+                  return (
+                    <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:'20px 22px', marginTop:12 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color:T.text4 }}>Recurring Commitments</div>
+                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, fontWeight:600, color:T.gold }}>${monthlyTotal.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}/mo</div>
                       </div>
-                      {monthTxs.length > 0 && (
-                        <button className="v-btn-ghost" onClick={()=>setView("ledger")} style={{ fontWeight:600, color:T.blue, fontSize:11 }}>View All →</button>
-                      )}
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                        {subs.map(t => (
+                          <div key={t.id} style={{ background:T.bgSubtle, border:`1px solid ${T.border}`, borderRadius:8, padding:'8px 12px', display:'flex', alignItems:'center', gap:8 }}>
+                            <div style={{ width:6, height:6, borderRadius:'50%', background:T.red, flexShrink:0 }} />
+                            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:500, color:T.text2 }}>{t.description || t.category}</span>
+                            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:T.text4 }}>${t.amount.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}/{t.recurringFreq==='weekly'?'wk':'mo'}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="v-recent-activity-scroll">
-                      <TxFeed txs={recentActivityTxs} onEdit={openEdit} onDelete={handleDelete} fmt={fmt} />
+                  );
+                })()}
+
+                {/* ── Financial Velocity ── */}
+                <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 20px", marginTop:12 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:20, flexWrap:"wrap" }}>
+                    <div>
+                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:6 }}>Financial Velocity · vs 3 months ago</div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                        <span style={{ fontSize:20 }}>{financialVelocity.improving ? "↗" : "↘"}</span>
+                        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:14, fontWeight:700, color: financialVelocity.improving?T.green:T.red }}>
+                          {financialVelocity.improving ? "ACCELERATING" : "DECELERATING"}
+                        </span>
+                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:T.text2 }}>
+                          {financialVelocity.delta >= 0 ? "+" : ""}{fmt(Math.abs(financialVelocity.delta))} net
+                        </span>
+                        {financialVelocity.pct !== null && (
+                          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600,
+                            color: financialVelocity.improving?T.green:T.red,
+                            background: financialVelocity.improving?T.greenLight:T.redLight,
+                            padding:"2px 8px", borderRadius:6 }}>
+                            {financialVelocity.pct >= 0 ? "+" : ""}{financialVelocity.pct.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ flex:1 }} />
+                    {/* Mini velocity bar */}
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:T.text4, marginBottom:4 }}>Trajectory</div>
+                      <div style={{ width:120, height:4, background:"rgba(0,0,0,0.06)", borderRadius:2, overflow:"hidden" }}>
+                        <div style={{
+                          height:"100%", borderRadius:2, transition:"width 1s ease",
+                          background: financialVelocity.improving?T.green:T.red,
+                          width: financialVelocity.pct === null ? "50%" : `${Math.max(5, Math.min(100, 50 + (financialVelocity.pct || 0) / 2))}%`,
+                        }} />
+                      </div>
                     </div>
                   </div>
                 </div>
+
               </div>
             )}
 
@@ -2934,11 +3598,29 @@ export default function Vault() {
             {view === "settings" && (
               <>
                 <div className="v-settings-tabs">
-                  {/* Currency tab REMOVED — USD only */}
-                  {[["data","Data"],["budgets","Budgets"],["categories","Categories"],["mockdata","Sample Data"],["danger","Danger Zone"]].map(([id,lbl])=>(
+                  {[["appearance","Appearance"],["data","Data"],["budgets","Budgets"],["categories","Categories"],["mockdata","Sample Data"],["danger","Danger Zone"]].map(([id,lbl])=>(
                     <button key={id} onClick={()=>setSettingsTab(id)} className={`v-settings-tab${settingsTab===id?" active":""}`}>{lbl}</button>
                   ))}
                 </div>
+
+                {settingsTab==="appearance" && (
+                  <div style={{ padding:'24px 0' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:T.text3, marginBottom:20, letterSpacing:'0.08em', textTransform:'uppercase' }}>Theme</div>
+                    <div style={{ display:'flex', gap:16 }}>
+                      {[['light','☀️','Clean & bright'],['dark','🌙','Vault aesthetic']].map(([mode,icon,desc]) => (
+                        <div key={mode} onClick={() => { setTheme(mode); localStorage.setItem('vault_theme', mode); }}
+                          style={{ cursor:'pointer', borderRadius:16, padding:'24px 20px', width:160, textAlign:'center',
+                            border:`2px solid ${theme===mode ? T.blue : T.border}`,
+                            background: theme===mode ? T.blueLight : T.bgCard,
+                            transition:'all 200ms ease', boxShadow: theme===mode ? `0 0 0 4px ${T.blueLight}` : 'none' }}>
+                          <div style={{ fontSize:28, marginBottom:10 }}>{icon}</div>
+                          <div style={{ fontWeight:600, color: theme===mode ? T.blue : T.text1, textTransform:'capitalize', fontSize:14 }}>{mode}</div>
+                          <div style={{ fontSize:11, color:T.text3, marginTop:5 }}>{desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {settingsTab==="data" && (
                   <div className="v-settings-grid">
@@ -3097,6 +3779,25 @@ export default function Vault() {
               </>
             )}
 
+            {/* ─── FORECAST ─── */}
+            {view === "forecast" && (
+              <VaultForecast
+                txs={txs}
+                baseLiquidity={baseLiq}
+                period={period}
+                monthlyChartData={monthlyChartData}
+              />
+            )}
+
+            {/* ─── GOALS ─── */}
+            {view === "goals" && (
+              <VaultGoals
+                goals={goals}
+                liquidity={liquidity}
+                onUpdateGoals={setGoals}
+              />
+            )}
+
             </div>
           </main>
         </div>
@@ -3234,6 +3935,17 @@ export default function Vault() {
           onThis={handleScopeThis}
           onAll={handleScopeAll}
           onClose={()=>setScopeAction(null)}
+        />
+      )}
+
+      {showCommandPalette && (
+        <VaultCommandPalette
+          onClose={() => setShowCommandPalette(false)}
+          onNavigate={setView}
+          onAddIncome={() => { openAdd(); }}
+          onAddExpense={() => { openAdd(); }}
+          onExportPDF={() => { exportStatement({ txs, baseLiq, budgets, period, fmt, fSign }); }}
+          onLoadSample={loadMockData}
         />
       )}
 
