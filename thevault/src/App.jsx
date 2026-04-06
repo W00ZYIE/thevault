@@ -1,27 +1,37 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, Area, AreaChart, ReferenceDot,
   PieChart, Pie, Cell, Tooltip as PieTooltip,
 } from "recharts";
 import AuthView from "./components/AuthView.jsx";
+import LandingPage from "./components/LandingPage.jsx";
 import { supabase, hasSupabaseConfig } from "./lib/supabaseClient.js";
 import VaultOnboarding from "./components/VaultOnboarding.jsx";
 import { exportStatement } from "./components/VaultStatementExport";
 import VaultExportButton from "./components/VaultStatementExport";
 import { useTrialState, TrialExpiredWall, TrialBanner } from "./components/VaultTrial"
-import VaultMission from "./components/VaultMission.jsx"
 import VaultInsights from "./components/VaultInsights.jsx";
-import VaultForecast from "./components/VaultForecast.jsx";
-import VaultGoals from "./components/VaultGoals.jsx";
+// VaultGoals replaced by inline VaultInvestments (Phase 3)
 import VaultCommandPalette from "./components/VaultCommandPalette.jsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.jsx";
+import { useTheme } from "./lib/ThemeContext.jsx";
+import "./styles/vault.css";
+import VaultInvestments from "./components/VaultInvestments.jsx";
+import TransactionDrawer from "./components/TransactionDrawer.jsx";
+
+// Plaid imports
+import { usePlaidAccounts } from "./lib/usePlaidAccounts.js";
+import VaultBankConnect from "./components/VaultBankConnect.jsx";
+import VaultConnectedAccounts from "./components/VaultConnectedAccounts.jsx";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MONTHS_FULL  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DAY_LABELS   = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
-const TODAY        = new Date();
-const TODAY_STR    = TODAY.toISOString().split("T")[0];
+const getToday    = () => new Date();
+const getTodayStr = () => new Date().toISOString().split("T")[0];
 const SEC_PER_MONTH = 30.4375 * 24 * 3600;
 
 const DEFAULT_CATS = {
@@ -35,1256 +45,66 @@ const CURRENCIES = [
 
 // ─── Design System ─────────────────────────────────────────────────────────────
 const LIGHT_T = {
-  bg:         '#FFFFFF',
-  bgSubtle:   '#F7F9FC',
-  bgCard:     '#FFFFFF',
-  sidebar:    '#FFFFFF',
-  text1:      '#0A0C10',
-  text2:      '#3D4452',
-  text3:      '#6B7280',
-  text4:      '#9CA3AF',
-  blue:       '#1A6FD4',
-  blueDark:   '#1254A8',
-  blueLight:  '#EBF3FF',
-  blueFaint:  '#F4F8FF',
-  gold:       '#E8A020',
-  goldLight:  '#FFF8E6',
-  green:      '#00B876',
-  greenLight: '#EDFBF4',
-  red:        '#E53935',
-  redLight:   '#FFF0F3',
-  border:     'rgba(0,0,0,0.08)',
-  borderMid:  'rgba(0,0,0,0.14)',
-  shadow:     '0 2px 12px rgba(0,0,0,0.07)',
-  shadowMd:   '0 4px 24px rgba(0,0,0,0.09)',
-  shadowLg:   '0 8px 48px rgba(0,0,0,0.11)',
-  radius:     '12px',
-  radiusSm:   '8px',
-  radiusLg:   '20px',
-  font:       "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-  mono:       "'JetBrains Mono', monospace",
+  bg:          '#FAFAFA',
+  bgSubtle:    '#F5F5F5',
+  bgCard:      '#FFFFFF',
+  sidebar:     '#FFFFFF',
+  text1:       '#0A0A0A',
+  text2:       '#3A3A3A',
+  text3:       '#888888',
+  text4:       '#BBBBBB',
+  blue:        '#1B4FCC',
+  blueDark:    '#1340A8',
+  blueLight:   '#F0F4FF',
+  blueFaint:   '#F7F9FF',
+  gold:        '#B8891A',
+  goldLight:   '#FBF6E8',
+  green:       '#059669',
+  greenLight:  '#F0FDF4',
+  red:         '#DC2626',
+  redLight:    '#FFF1F2',
+  border:      'rgba(0,0,0,0.06)',
+  borderMid:   'rgba(0,0,0,0.10)',
+  shadow:      'none',
+  shadowMd:    'none',
+  shadowLg:    '0 8px 32px rgba(0,0,0,0.06)',
+  radius:      '8px',
+  radiusSm:    '4px',
+  radiusLg:    '12px',
+  font:        "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono:        "'JetBrains Mono', monospace",
 };
 const DARK_T = {
-  bg:         '#0A0C10',
-  bgSubtle:   '#0F1218',
-  bgCard:     '#141820',
-  sidebar:    '#0C0F14',
-  text1:      '#E8EDF5',
-  text2:      '#9BA8BB',
-  text3:      '#5C6678',
-  text4:      '#3A4454',
-  blue:       '#4B9FEA',
-  blueDark:   '#2E7FCA',
-  blueLight:  'rgba(75,159,234,0.12)',
-  blueFaint:  'rgba(75,159,234,0.06)',
-  gold:       '#F0C060',
-  goldLight:  'rgba(240,192,96,0.12)',
-  green:      '#00D68F',
-  greenLight: 'rgba(0,214,143,0.12)',
-  red:        '#FF6B7A',
-  redLight:   'rgba(255,107,122,0.12)',
-  border:     'rgba(255,255,255,0.06)',
-  borderMid:  'rgba(255,255,255,0.10)',
-  shadow:     '0 2px 16px rgba(0,0,0,0.4)',
-  shadowMd:   '0 4px 32px rgba(0,0,0,0.5)',
-  shadowLg:   '0 8px 64px rgba(0,0,0,0.6)',
-  radius:     '12px',
-  radiusSm:   '8px',
-  radiusLg:   '20px',
-  font:       "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-  mono:       "'JetBrains Mono', monospace",
+  bg:          '#111111',
+  bgSubtle:    '#161616',
+  bgCard:      '#1A1A1A',
+  sidebar:     '#111111',
+  text1:       '#F0F0F0',
+  text2:       '#909090',
+  text3:       '#555555',
+  text4:       '#333333',
+  blue:        '#4D7FE8',
+  blueDark:    '#3666CC',
+  blueLight:   'rgba(77,127,232,0.10)',
+  blueFaint:   'rgba(77,127,232,0.05)',
+  gold:        '#D4A034',
+  goldLight:   'rgba(212,160,52,0.10)',
+  green:       '#10B981',
+  greenLight:  'rgba(16,185,129,0.10)',
+  red:         '#EF4444',
+  redLight:    'rgba(239,68,68,0.10)',
+  border:      'rgba(255,255,255,0.06)',
+  borderMid:   'rgba(255,255,255,0.10)',
+  shadow:      'none',
+  shadowMd:    'none',
+  shadowLg:    '0 8px 64px rgba(0,0,0,0.5)',
+  radius:      '8px',
+  radiusSm:    '4px',
+  radiusLg:    '12px',
+  font:        "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono:        "'JetBrains Mono', monospace",
 };
-// Mutable working copy — reassigned in Vault() before each render so sub-components pick up the correct theme
 let T = { ...LIGHT_T };
-
-// ─── Global CSS ────────────────────────────────────────────────────────────────
-const VAULT_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html, body, #root {
-  width: 100%; height: 100%;
-  background: #FFFFFF;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  color: #3D4452;
-}
-
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 2px; }
-
-input, select, textarea { outline: none; font-family: inherit; background: none; }
-input[type=date] { cursor: pointer; }
-input[type=date]::-webkit-calendar-picker-indicator {
-  filter: none;
-  opacity: 0.5;
-  cursor: pointer;
-}
-select option { background: #FFFFFF; color: #0A0C10; }
-button { cursor: pointer; font-family: inherit; }
-input[type=number]::-webkit-inner-spin-button,
-input[type=number]::-webkit-outer-spin-button { opacity: 0; }
-
-.v-mono { font-family: 'JetBrains Mono', monospace; }
-.v-label {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; color: #9CA3AF;
-  font-family: 'Inter', sans-serif;
-}
-.v-label-hi {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; color: #6B7280;
-  font-family: 'Inter', sans-serif;
-}
-
-/* ── App root ── */
-.v-app {
-  display: flex; height: 100vh; overflow: hidden;
-  background: #F7F9FC;
-}
-
-/* ── Sidebar ── */
-.v-sidebar {
-  width: 210px; min-width: 210px;
-  background: #FFFFFF;
-  border-right: 1px solid rgba(0,0,0,0.08);
-  display: flex; flex-direction: column;
-  flex-shrink: 0; height: 100%; overflow-y: auto;
-  position: relative;
-}
-.v-sidebar::after { display: none; }
-
-/* Logo block */
-.v-sidebar-logo {
-  padding: 18px 18px 16px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-.v-sidebar-logo::after { display: none; }
-.v-sidebar-logo-img {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-}
-
-.v-mobile-logo-img {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-}
-
-/* Liquidity widget */
-.v-liq {
-  margin: 14px 12px 0;
-  padding: 16px 14px;
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 10px;
-  position: relative; overflow: hidden;
-}
-.v-liq::before { display: none; }
-.v-liq-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 10px; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  color: #9CA3AF; margin-bottom: 10px;
-}
-.v-liq-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 17px; font-weight: 500;
-  letter-spacing: -0.03em; line-height: 1;
-  transition: color 0.4s;
-}
-.v-liq-sub {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px; color: #9CA3AF; margin-top: 5px;
-}
-
-/* Budget alerts */
-.v-budget-alert {
-  margin: 8px 12px 0;
-  padding: 10px 12px;
-  background: #FFF0F3;
-  border: 1px solid rgba(229,57,53,0.15);
-  border-left: 3px solid #E53935;
-  border-radius: 8px;
-}
-
-/* Nav */
-.v-nav { padding: 14px 8px; flex: 1; }
-.v-nav-item {
-  display: flex; align-items: center; justify-content: space-between;
-  width: 100%; text-align: left;
-  padding: 9px 10px 9px 14px;
-  background: transparent;
-  border: none;
-  border-left: 3px solid transparent;
-  color: #6B7280;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px; font-weight: 500;
-  letter-spacing: 0;
-  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
-  margin-bottom: 1px; position: relative;
-  border-radius: 6px;
-}
-.v-nav-item:hover { background: #F7F9FC; color: #3D4452; }
-.v-nav-item.active {
-  color: #1A6FD4;
-  border-left-color: #1A6FD4;
-  background: #F4F8FF;
-}
-.v-nav-item.active::after { display: none; }
-.v-nav-key {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px; letter-spacing: 0.05em;
-  color: #9CA3AF;
-  background: #F7F9FC;
-  border: 1px solid rgba(0,0,0,0.08);
-  padding: 2px 5px;
-  border-radius: 4px;
-}
-.v-nav-item.active .v-nav-key { color: #1A6FD4; background: #EBF3FF; }
-
-/* Sidebar actions */
-.v-sidebar-actions {
-  padding: 14px;
-  position: relative;
-}
-.v-sidebar-actions::before { display: none; }
-
-.v-sidebar-bottom {
-  margin-top: auto;
-  padding-bottom: 14px;
-}
-.v-btn-primary {
-  width: 100%; padding: 10px 0;
-  background: linear-gradient(135deg, #1A6FD4 0%, #1254A8 100%);
-  border: none;
-  color: #FFFFFF; font-family: 'Inter', sans-serif;
-  font-size: 13px; font-weight: 600;
-  letter-spacing: 0; text-transform: none;
-  transition: all 200ms;
-  position: relative; overflow: hidden;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(26,111,212,0.25);
-}
-.v-btn-primary::after { display: none; }
-.v-btn-primary:hover {
-  background: linear-gradient(135deg, #1254A8 0%, #0e3f85 100%);
-  color: #FFFFFF;
-  box-shadow: 0 4px 16px rgba(26,111,212,0.35);
-  transform: translateY(-1px);
-}
-.v-btn-secondary {
-  padding: 9px 14px;
-  background: #FFFFFF;
-  border: 1.5px solid rgba(0,0,0,0.14);
-  color: #3D4452; font-family: 'Inter', sans-serif;
-  font-size: 13px; font-weight: 500; letter-spacing: 0;
-  transition: all 150ms;
-  border-radius: 8px;
-}
-.v-btn-secondary:hover { border-color: rgba(0,0,0,0.22); color: #0A0C10; }
-.v-btn-ghost {
-  background: transparent; border: none;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px; font-weight: 500; letter-spacing: 0;
-  color: #6B7280; transition: color 150ms; padding: 2px 0;
-}
-.v-btn-ghost:hover { color: #0A0C10; }
-
-/* Account */
-.v-account {
-  margin: 8px 12px 16px;
-  padding: 11px 12px;
-  border: 1px solid rgba(0,0,0,0.06);
-  background: #F7F9FC;
-  display: flex; align-items: center; gap: 9px;
-  border-radius: 8px;
-}
-.v-account-avatar {
-  width: 26px; height: 26px; flex-shrink: 0;
-  background: #EBF3FF;
-  border: 1px solid rgba(26,111,212,0.2);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 600; color: #1A6FD4;
-  font-family: 'Inter', sans-serif;
-}
-.v-account-email {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px; color: #6B7280;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
-}
-.v-account-signout {
-  background: none; border: none;
-  font-family: 'Inter', sans-serif;
-  font-size: 11px; font-weight: 500;
-  color: #9CA3AF; padding: 0;
-  transition: color 150ms;
-}
-.v-account-signout:hover { color: #E53935; }
-
-/* ── Main ── */
-.v-main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%; background: #F7F9FC; }
-
-/* Header */
-.v-header {
-  padding: 16px 32px;
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  background: #FFFFFF;
-  display: flex; align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0; gap: 12px; flex-wrap: wrap;
-  position: relative;
-}
-.v-header::after { display: none; }
-.v-header-breadcrumb {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px; font-weight: 500; letter-spacing: 0;
-  text-transform: none; color: #9CA3AF; margin-bottom: 4px;
-}
-.v-header-title {
-  font-family: 'Inter', sans-serif;
-  font-size: 16px; font-weight: 700;
-  letter-spacing: -0.01em; color: #0A0C10;
-}
-.v-period-nav { display: flex; align-items: center; gap: 8px; }
-.v-period-btn {
-  width: 28px; height: 28px;
-  background: #F7F9FC;
-  border: 1px solid rgba(0,0,0,0.08);
-  color: #6B7280; display: flex;
-  align-items: center; justify-content: center;
-  font-size: 14px; transition: all 150ms;
-  border-radius: 6px;
-}
-.v-period-btn:hover { color: #1A6FD4; border-color: rgba(26,111,212,0.25); background: #EBF3FF; }
-.v-period-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px; font-weight: 600; color: #0A0C10;
-  min-width: 154px; text-align: center;
-}
-
-/* Content */
-.v-content {
-  flex: 1; overflow-y: auto;
-  padding: 0;
-  min-height: 0;
-  background: #F7F9FC;
-}
-
-/* Inner content wrapper with padding */
-.v-content-inner {
-  padding: 20px 24px 60px;
-  width: 100%;
-  min-width: 0;
-  min-height: 100%;
-}
-
-.v-content-inner--wide {
-  padding: 0;
-  min-height: 100%;
-}
-
-/* ── Intelligence strip ── */
-.v-intel-strip {
-  border: 1px solid rgba(0,0,0,0.08);
-  background: #FFFFFF;
-  border-radius: 12px;
-  padding: 10px 18px;
-  display: flex; align-items: center; gap: 18px;
-  margin-bottom: 12px; overflow: hidden; flex-wrap: wrap;
-}
-.v-intel-msg {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 12px; letter-spacing: 0;
-  font-family: 'Inter', sans-serif;
-}
-.v-intel-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-}
-
-/* ── Net Position hero ── */
-.v-net-hero {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  padding: 28px 32px;
-  margin-bottom: 12px; position: relative; overflow: hidden;
-}
-.v-net-hero::before { display: none; }
-.v-net-value {
-  font-family: 'Inter', sans-serif;
-  font-size: 52px; font-weight: 800;
-  letter-spacing: -0.04em; line-height: 1;
-  transition: color 0.5s;
-}
-.v-net-grid {
-  display: grid;
-  grid-template-columns: 340px 1px 1fr 1fr 1fr;
-  gap: 0; align-items: stretch;
-}
-.v-net-divider {
-  width: 1px;
-  background: rgba(0,0,0,0.08);
-  margin: 0 12px;
-}
-
-/* ── Secondary KPIs ── */
-.v-kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.v-kpi-card {
-  padding: 20px 22px;
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  transition: box-shadow 150ms, transform 150ms;
-}
-.v-kpi-card:hover {
-  box-shadow: 0 4px 24px rgba(0,0,0,0.09);
-  transform: translateY(-1px);
-}
-.v-kpi-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; color: #9CA3AF; margin-bottom: 10px;
-}
-.v-kpi-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 20px; font-weight: 500;
-  letter-spacing: -0.04em; line-height: 1;
-  margin-bottom: 6px; word-break: break-all;
-}
-.v-kpi-sub {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px; color: #9CA3AF;
-}
-
-/* ── Chart panel ── */
-.v-chart-panel {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  margin-bottom: 12px;
-  width: 100%;
-}
-.v-chart-header {
-  padding: 20px 24px 0;
-  display: flex; align-items: flex-start;
-  justify-content: space-between; flex-wrap: wrap; gap: 10px;
-}
-.v-anomaly-badge {
-  font-family: 'Inter', sans-serif;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
-  padding: 3px 8px; text-transform: uppercase;
-  background: #FFF0F3;
-  border: 1px solid rgba(229,57,53,0.2);
-  color: #E53935;
-  border-radius: 4px;
-}
-
-/* ── Projection tile ── */
-.v-proj-grid {
-  display: grid; grid-template-columns: repeat(3,1fr);
-  gap: 12px; margin-bottom: 12px;
-}
-.v-proj-tile {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  padding: 18px 20px;
-}
-
-/* ── Split ── */
-.v-split {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) minmax(0,1.65fr);
-  gap: 12px;
-}
-
-/* ── Panel ── */
-.v-panel {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.v-panel-header {
-  padding: 18px 22px 14px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-}
-
-/* ── Calendar ── */
-.v-cal-wrapper {
-  display: flex;
-  flex-direction: column;
-  min-height: calc(100vh - 130px);
-  background: transparent;
-}
-
-.v-cal-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
-  gap: 12px;
-  align-items: stretch;
-  flex: 1;
-  min-height: 640px;
-}
-
-.v-cal-main {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.v-cal-month-header {
-  padding: 18px 22px 14px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.v-cal-day-labels {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  background: #F7F9FC;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-}
-
-.v-cal-day-label {
-  padding: 8px 0;
-  text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #9CA3AF;
-  text-transform: uppercase;
-}
-
-.v-cal-day-label.weekend {
-  color: #9CA3AF;
-  opacity: 0.6;
-}
-
-.v-cal-cells {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  flex: 1;
-}
-
-.v-cal-day {
-  min-height: 110px;
-  padding: 10px 9px;
-  background: transparent;
-  border-right: 1px solid rgba(0,0,0,0.05);
-  border-bottom: 1px solid rgba(0,0,0,0.05);
-  cursor: pointer;
-  transition: all 180ms cubic-bezier(0.16,1,0.3,1);
-  position: relative; overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.v-cal-day:hover { background: #F7F9FC; }
-.v-cal-day.selected {
-  background: #EBF3FF;
-  border-color: rgba(26,111,212,0.2);
-}
-
-.v-cal-day.today {
-  border: 2px solid #1A6FD4;
-  background: #F4F8FF;
-}
-
-.v-cal-today-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px; height: 22px;
-  background: #1A6FD4;
-  border-radius: 50%;
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  color: #FFFFFF;
-  font-weight: 700;
-}
-
-.v-cal-empty {
-  background: #F7F9FC;
-  border-right: 1px solid rgba(0,0,0,0.04);
-  border-bottom: 1px solid rgba(0,0,0,0.04);
-}
-
-/* Day subtle tint effects */
-.v-cal-day.has-gain::after {
-  content: '';
-  position: absolute; inset: 0;
-  background: rgba(0,184,118,0.02);
-  pointer-events: none;
-}
-.v-cal-day.has-loss::after {
-  content: '';
-  position: absolute; inset: 0;
-  background: rgba(229,57,53,0.02);
-  pointer-events: none;
-  animation: loss-pulse 3s ease-in-out infinite;
-}
-@keyframes loss-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.6; transform: scale(1.3); }
-}
-
-/* ── Transaction Feed ── */
-.v-feed-group { margin-bottom: 8px; }
-.v-feed-date-row {
-  padding: 7px 20px;
-  background: #F7F9FC;
-  border-radius: 6px;
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 4px;
-}
-.v-feed-entry {
-  display: flex; align-items: center; gap: 0;
-  padding: 0;
-  background: #FFFFFF;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-  transition: all 180ms cubic-bezier(0.16,1,0.3,1);
-  cursor: pointer; position: relative; overflow: hidden;
-}
-.v-feed-entry:hover { background: #F7F9FC; }
-.v-feed-entry:hover .v-feed-actions { opacity: 1; }
-.v-feed-indicator {
-  width: 3px; align-self: stretch; flex-shrink: 0;
-}
-.v-feed-body {
-  flex: 1; min-width: 0;
-  display: flex; align-items: center;
-  padding: 12px 16px; gap: 14px;
-}
-.v-feed-amount {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px; font-weight: 500;
-  letter-spacing: -0.03em; flex-shrink: 0;
-  padding-right: 18px;
-}
-.v-feed-actions {
-  position: absolute; right: 16px; top: 50%;
-  transform: translateY(-50%);
-  opacity: 0; transition: opacity 150ms;
-  display: flex; gap: 10px;
-}
-
-/* ── Recent Activity scroll ── */
-.v-recent-activity-scroll {
-  max-height: 260px;
-  overflow-y: auto; overflow-x: hidden;
-  scrollbar-width: none; -ms-overflow-style: none;
-  touch-action: pan-y;
-}
-.v-recent-activity-scroll::-webkit-scrollbar { width: 0; height: 0; }
-
-/* ── Badge ── */
-.v-badge {
-  display: inline-flex; align-items: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
-  padding: 2px 7px; text-transform: uppercase; flex-shrink: 0;
-  border-radius: 4px;
-}
-
-/* ── Budget bar ── */
-.v-budget-bar { margin-bottom: 16px; }
-.v-budget-bar-track {
-  height: 4px; background: rgba(0,0,0,0.06); margin-top: 7px; border-radius: 2px;
-}
-.v-budget-bar-fill { height: 100%; transition: width 400ms cubic-bezier(0.16,1,0.3,1); border-radius: 2px; }
-
-/* ── Tag ── */
-.v-tag {
-  font-family: 'Inter', sans-serif;
-  font-size: 10px; font-weight: 500; padding: 2px 8px;
-  background: #F7F9FC;
-  border: 1px solid rgba(0,0,0,0.08);
-  color: #6B7280;
-  white-space: nowrap;
-  border-radius: 4px;
-}
-
-/* ── Modal ── */
-.v-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.35);
-  backdrop-filter: blur(8px);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 300;
-}
-.v-modal {
-  width: 420px; max-width: calc(100vw - 24px);
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 20px;
-  padding: 30px;
-  max-height: 90vh; overflow-y: auto;
-  box-shadow: 0 16px 64px rgba(0,0,0,0.13);
-  position: relative;
-}
-.v-modal::before { display: none; }
-
-/* ── Input ── */
-.v-input {
-  width: 100%;
-  background: #FFFFFF;
-  border: 1.5px solid rgba(0,0,0,0.12);
-  border-radius: 8px;
-  padding: 10px 13px;
-  color: #0A0C10; font-size: 13px;
-  font-family: inherit;
-  transition: border-color 150ms, box-shadow 150ms;
-}
-.v-input:focus { border-color: #1A6FD4; box-shadow: 0 0 0 3px rgba(26,111,212,0.12); }
-
-/* ── Field ── */
-.v-field { margin-bottom: 15px; }
-.v-field-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 12px; font-weight: 600; letter-spacing: 0;
-  text-transform: none; color: #3D4452; margin-bottom: 6px;
-  display: block;
-}
-
-/* ── Toast ── */
-.v-toast-stack {
-  position: fixed; bottom: 24px; left: 50%;
-  transform: translateX(-50%);
-  display: flex; flex-direction: column;
-  gap: 5px; z-index: 999; align-items: center;
-}
-.v-toast {
-  display: flex; align-items: center; gap: 12px;
-  padding: 11px 16px;
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 10px;
-  min-width: 260px; max-width: 400px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px; color: #0A0C10;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.09);
-}
-
-/* ── Settings ── */
-.v-settings-tabs {
-  display: flex;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-  margin-bottom: 22px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  gap: 4px;
-}
-.v-settings-tab {
-  padding: 9px 16px;
-  background: transparent; border: none;
-  border-bottom: 2px solid transparent;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px; font-weight: 500;
-  letter-spacing: 0; text-transform: none;
-  color: #6B7280; margin-bottom: -1px;
-  transition: all 150ms;
-  white-space: nowrap;
-  border-radius: 6px 6px 0 0;
-}
-.v-settings-tab:hover { color: #3D4452; background: #F7F9FC; }
-.v-settings-tab.active { color: #1A6FD4; border-bottom-color: #1A6FD4; background: #EBF3FF; }
-.v-settings-card {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  padding: 24px;
-}
-.v-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-/* ── Chip filter ── */
-.v-filter-chips { display: flex; gap: 4px; }
-.v-filter-chip {
-  padding: 6px 14px;
-  background: #F7F9FC;
-  border: 1px solid rgba(0,0,0,0.08);
-  color: #6B7280; font-family: 'Inter', sans-serif;
-  font-size: 12px; font-weight: 500; letter-spacing: 0;
-  text-transform: none;
-  border-radius: 6px;
-  transition: all 150ms;
-}
-.v-filter-chip:hover { color: #3D4452; border-color: rgba(0,0,0,0.14); }
-.v-filter-chip.active {
-  background: #EBF3FF;
-  color: #1A6FD4;
-  border-color: rgba(26,111,212,0.25);
-}
-
-/* ── Type toggle ── */
-.v-type-toggle {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 8px; margin-bottom: 22px;
-}
-.v-type-btn {
-  padding: 11px; background: #F7F9FC;
-  border: 1.5px solid rgba(0,0,0,0.08); border-radius: 8px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px; font-weight: 600;
-  letter-spacing: 0; text-transform: none;
-  color: #6B7280; transition: all 150ms;
-}
-.v-type-btn.active-income  { color: #00B876; background: #EDFBF4; border-color: rgba(0,184,118,0.3); }
-.v-type-btn.active-expense { color: #E53935; background: #FFF0F3; border-color: rgba(229,57,53,0.3); }
-
-/* ── Modal actions ── */
-.v-modal-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 22px; }
-
-/* ── Toggle ── */
-.v-toggle-wrapper {
-  padding: 13px 15px;
-  background: #F7F9FC;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 10px;
-  margin-bottom: 15px;
-}
-.v-toggle {
-  width: 38px; height: 21px;
-  border: 1.5px solid;
-  position: relative; cursor: pointer; flex-shrink: 0;
-  background: none; transition: border-color 150ms;
-  border-radius: 12px;
-}
-.v-toggle-thumb {
-  position: absolute; top: 2px;
-  width: 15px; height: 15px;
-  transition: left 150ms;
-  border-radius: 50%;
-}
-
-/* ── Danger ── */
-.v-danger-btn {
-  padding: 9px 18px;
-  background: #FFF0F3;
-  border: 1px solid rgba(229,57,53,0.2);
-  color: #E53935; font-family: 'Inter', sans-serif;
-  font-size: 13px; font-weight: 600; letter-spacing: 0;
-  border-radius: 8px; transition: all 150ms;
-}
-.v-danger-btn:hover { background: rgba(229,57,53,0.12); }
-
-/* ── Scope modal ── */
-.v-scope-btn {
-  width: 100%; padding: 13px 16px;
-  background: #F7F9FC;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 8px;
-  color: #0A0C10; font-family: inherit;
-  font-size: 13px; text-align: left;
-  transition: background 150ms;
-}
-.v-scope-btn:hover { background: #EBF3FF; }
-
-/* ── Date range ── */
-.v-date-range { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
-/* Native date input */
-.v-date-input {
-  background: #FFFFFF;
-  border: 1.5px solid rgba(0,0,0,0.12);
-  border-radius: 8px;
-  padding: 8px 10px;
-  color: #0A0C10;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  transition: border-color 150ms;
-}
-.v-date-input:focus { border-color: #1A6FD4; box-shadow: 0 0 0 3px rgba(26,111,212,0.12); }
-
-/* ── Filter bar ── */
-.v-filter-bar {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  padding: 12px 16px;
-  display: flex; align-items: center;
-  gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
-}
-.v-search-wrap { position: relative; flex: 1; min-width: 160px; }
-.v-search-icon {
-  position: absolute; left: 12px; top: 50%;
-  transform: translateY(-50%); color: #9CA3AF;
-  font-size: 14px; pointer-events: none; line-height: 1;
-}
-.v-search-input {
-  width: 100%;
-  background: #F7F9FC;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 8px;
-  padding: 9px 32px;
-  color: #0A0C10; font-size: 13px;
-  font-family: inherit; transition: border-color 150ms;
-}
-.v-search-input:focus { border-color: #1A6FD4; box-shadow: 0 0 0 3px rgba(26,111,212,0.12); }
-.v-search-clear {
-  position: absolute; right: 9px; top: 50%;
-  transform: translateY(-50%);
-  background: none; border: none;
-  color: #9CA3AF; font-size: 14px; line-height: 1;
-  transition: color 150ms;
-}
-.v-search-clear:hover { color: #0A0C10; }
-
-/* ── Ledger search summary ── */
-.v-search-summary {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-top: none;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.v-search-summary-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.v-search-summary-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #9CA3AF;
-}
-.v-search-summary-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
-  color: #0A0C10;
-}
-
-/* ── Empty ── */
-.v-empty {
-  padding: 48px 20px; text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  color: #9CA3AF;
-}
-
-/* ── Mobile top ── */
-.v-mobile-topbar {
-  display: none; padding: 14px 16px;
-  background: #FFFFFF;
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  align-items: center; justify-content: space-between;
-  position: sticky; top: 0; z-index: 50; flex-shrink: 0;
-}
-.v-mobile-bottomnav {
-  display: none;
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: #FFFFFF;
-  border-top: 1px solid rgba(0,0,0,0.08);
-  padding: 8px 0 env(safe-area-inset-bottom, 12px); z-index: 50;
-  grid-template-columns: repeat(4, 1fr);
-}
-.v-mobile-nav-item {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  background: none; border: none; color: #9CA3AF;
-  font-family: 'Inter', sans-serif;
-  font-size: 10px; font-weight: 500;
-  letter-spacing: 0; text-transform: none;
-  transition: color 150ms; padding: 6px 0;
-  -webkit-tap-highlight-color: transparent;
-  min-height: 44px; justify-content: center;
-}
-.v-mobile-nav-item.active { color: #1A6FD4; }
-.v-mobile-nav-item svg { width: 20px; height: 20px; }
-.v-mobile-add-fab {
-  position: fixed; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); right: 20px;
-  width: 52px; height: 52px;
-  background: #1A6FD4;
-  border: none;
-  color: #FFFFFF;
-  font-size: 26px; font-weight: 300;
-  display: none; align-items: center; justify-content: center;
-  box-shadow: 0 8px 32px rgba(26,111,212,0.35);
-  z-index: 60; transition: all 150ms;
-  border-radius: 50%;
-  -webkit-tap-highlight-color: transparent;
-}
-.v-mobile-add-fab:hover { background: #1254A8; }
-.v-mobile-add-fab:active { transform: scale(0.94); }
-
-/* ── Custom tooltip ── */
-.v-tip {
-  background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 10px;
-  padding: 12px 16px; font-family: 'Inter', sans-serif;
-  font-size: 12px; min-width: 160px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.09);
-}
-
-/* ── Amount display ── */
-.v-amount-display {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 38px; font-weight: 400;
-  letter-spacing: -0.05em;
-  text-align: center;
-  color: #0A0C10;
-  caret-color: transparent;
-  user-select: none;
-}
-.v-amount-hint {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px; color: #9CA3AF; text-align: center; margin-top: 6px;
-}
-
-/* ─────────────────────────────────────────────
-   MOBILE RESPONSIVE  (≤ 860 px)
-───────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .v-sidebar { display: none !important; }
-  .v-mobile-topbar { display: flex !important; }
-  .v-mobile-bottomnav { display: grid !important; }
-  .v-mobile-add-fab { display: flex !important; }
-  .v-app { flex-direction: column; height: 100svh; overflow: hidden; }
-  .v-main { height: 100%; overflow: hidden; }
-
-  /* Comfortable content padding that clears the FAB + bottom nav */
-  .v-content-inner { padding: 12px 12px 140px; }
-  .v-content-inner--wide { padding: 0 0 140px; }
-
-  .v-header { display: none !important; }
-
-  /* ── Mobile KPI strip: 2×2 grid ── */
-  .v-kpi-strip { grid-template-columns: repeat(2, 1fr); }
-
-  /* ── Ledger KPI bar: 2×2 with compact style ── */
-  .v-ledger-kpi-bar {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  .v-ledger-kpi-bar .v-kpi-card {
-    padding: 14px 14px !important;
-    border-right: none !important;
-  }
-  .v-ledger-kpi-bar .v-kpi-value {
-    font-size: 15px !important;
-    word-break: break-all;
-  }
-  .v-ledger-kpi-bar .v-kpi-label {
-    font-size: 9px !important;
-    margin-bottom: 6px !important;
-  }
-  .v-ledger-kpi-bar .v-kpi-sub {
-    font-size: 10px !important;
-  }
-
-  .v-split { grid-template-columns: 1fr; }
-  .v-cal-grid { grid-template-columns: 1fr; }
-  .v-proj-grid { grid-template-columns: 1fr; }
-  .v-settings-grid { grid-template-columns: 1fr; }
-  .v-net-grid { grid-template-columns: 1fr; }
-  .v-net-divider { display: none; }
-  .v-modal { padding: 20px 16px; }
-  .v-filter-bar { flex-direction: column; align-items: stretch; }
-
-  /* Mobile feed: show actions always (no hover) */
-  .v-feed-actions { opacity: 1 !important; position: static; transform: none; }
-  .v-feed-body { flex-wrap: wrap; gap: 8px; }
-  .v-feed-amount { padding-right: 0 !important; }
-
-  /* Net hero mobile */
-  .v-net-hero { padding: 20px 16px; }
-  .v-net-value { font-size: 36px !important; }
-
-  /* Calendar mobile: smaller day cells */
-  .v-cal-day { min-height: 70px; padding: 6px 5px; }
-  .v-cal-day-label { font-size: 9px; padding: 6px 0; }
-
-  /* Mobile calendar — hide detail panel on mobile (it overlays) */
-  .v-cal-grid { grid-template-columns: 1fr !important; }
-
-  /* Touch feedback */
-  .v-feed-entry:active { background: #F7F9FC; }
-  .v-cal-day:active { background: #EBF3FF; }
-  .v-btn-primary:active { opacity: 0.8; }
-  .v-btn-secondary:active { opacity: 0.7; }
-
-  /* Mobile toast - higher above nav */
-  .v-toast-stack { bottom: 90px; }
-}
-
-/* ── Premium KPI card animations ── */
-@keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.v-kpi-premium {
-  background: #FFFFFF;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  padding: 18px 20px 16px;
-  cursor: default;
-  transition: transform 180ms ease, box-shadow 180ms ease;
-  animation: fadeSlideUp 0.35s ease forwards;
-  position: relative;
-  overflow: hidden;
-}
-.v-kpi-premium:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.09);
-}
-.v-kpi-number {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  line-height: 1.1;
-}
-.v-grade-badge {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  width: 56px; min-width: 56px; height: 64px;
-  border-radius: 10px; border: 1.5px solid; cursor: pointer;
-  transition: transform 150ms ease, box-shadow 150ms ease;
-  font-family: 'Inter', sans-serif;
-}
-.v-grade-badge:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
-.v-priority-item {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 12px 14px; border-radius: 8px;
-  background: #F7F9FC; border: 1px solid rgba(0,0,0,0.06);
-  transition: background 150ms;
-}
-.v-priority-item:hover { background: #EBF3FF; }
-.v-milestone-badge {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 6px 12px; border-radius: 20px;
-  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
-  border: 1px solid; cursor: pointer;
-  animation: fadeSlideUp 0.4s ease forwards;
-}
-`;
-
-
-// ─── Dark Mode CSS Overrides ───────────────────────────────────────────────────
-const DARK_CSS = `
-html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] #root {
-  background: #0A0C10; color: #9BA8BB;
-}
-html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); }
-html[data-theme="dark"] select option { background: #141820; color: #E8EDF5; }
-html[data-theme="dark"] .v-app { background: #0F1218; }
-html[data-theme="dark"] .v-sidebar { background: #0C0F14; border-right-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-sidebar-logo { border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-liq { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-liq-label { color: #3A4454; }
-html[data-theme="dark"] .v-liq-sub { color: #3A4454; }
-html[data-theme="dark"] .v-nav-item { color: #5C6678; }
-html[data-theme="dark"] .v-nav-item:hover { background: #0F1218; color: #9BA8BB; }
-html[data-theme="dark"] .v-nav-item.active { color: #4B9FEA; border-left-color: #4B9FEA; background: rgba(75,159,234,0.12); }
-html[data-theme="dark"] .v-nav-key { color: #3A4454; background: #0F1218; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-nav-item.active .v-nav-key { color: #4B9FEA; background: rgba(75,159,234,0.12); }
-html[data-theme="dark"] .v-btn-primary { background: #4B9FEA; }
-html[data-theme="dark"] .v-btn-primary:hover { background: #2E7FCA; }
-html[data-theme="dark"] .v-btn-secondary { background: #141820; border-color: rgba(255,255,255,0.10); color: #9BA8BB; }
-html[data-theme="dark"] .v-btn-secondary:hover { border-color: rgba(255,255,255,0.20); color: #E8EDF5; }
-html[data-theme="dark"] .v-btn-ghost { color: #5C6678; }
-html[data-theme="dark"] .v-btn-ghost:hover { color: #E8EDF5; }
-html[data-theme="dark"] .v-account { background: #0F1218; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-account-email { color: #5C6678; }
-html[data-theme="dark"] .v-account-signout { color: #3A4454; }
-html[data-theme="dark"] .v-main { background: #0F1218; }
-html[data-theme="dark"] .v-header { background: #0C0F14; border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-header-breadcrumb { color: #3A4454; }
-html[data-theme="dark"] .v-header-title { color: #E8EDF5; }
-html[data-theme="dark"] .v-period-btn { background: #0F1218; border-color: rgba(255,255,255,0.06); color: #5C6678; }
-html[data-theme="dark"] .v-period-btn:hover { color: #4B9FEA; border-color: rgba(75,159,234,0.25); background: rgba(75,159,234,0.12); }
-html[data-theme="dark"] .v-period-label { color: #E8EDF5; }
-html[data-theme="dark"] .v-content { background: #0F1218; }
-html[data-theme="dark"] .v-intel-strip { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-net-hero { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-net-divider { background: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-kpi-card { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-kpi-label { color: #3A4454; }
-html[data-theme="dark"] .v-kpi-sub { color: #3A4454; }
-html[data-theme="dark"] .v-chart-panel { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-proj-tile { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-panel { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-panel-header { border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-cal-main { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-cal-month-header { border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-cal-day-labels { background: #0F1218; border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-cal-day-label { color: #3A4454; }
-html[data-theme="dark"] .v-cal-day { border-right-color: rgba(255,255,255,0.04); border-bottom-color: rgba(255,255,255,0.04); }
-html[data-theme="dark"] .v-cal-day:hover { background: #0F1218; }
-html[data-theme="dark"] .v-cal-day.selected { background: rgba(75,159,234,0.10); border-color: rgba(75,159,234,0.2); }
-html[data-theme="dark"] .v-cal-day.today { background: rgba(75,159,234,0.08); }
-html[data-theme="dark"] .v-cal-empty { background: #0F1218; border-right-color: rgba(255,255,255,0.03); border-bottom-color: rgba(255,255,255,0.03); }
-html[data-theme="dark"] .v-feed-date-row { background: #0F1218; }
-html[data-theme="dark"] .v-feed-entry { background: #141820; border-bottom-color: rgba(255,255,255,0.04); }
-html[data-theme="dark"] .v-feed-entry:hover { background: #1a2030; }
-html[data-theme="dark"] .v-budget-bar-track { background: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-tag { background: #0F1218; border-color: rgba(255,255,255,0.06); color: #5C6678; }
-html[data-theme="dark"] .v-modal { background: #141820; border-color: rgba(255,255,255,0.08); box-shadow: 0 16px 64px rgba(0,0,0,0.6); }
-html[data-theme="dark"] .v-input { background: #0F1218; border-color: rgba(255,255,255,0.10); color: #E8EDF5; }
-html[data-theme="dark"] .v-field-label { color: #9BA8BB; }
-html[data-theme="dark"] .v-toast { background: #141820; border-color: rgba(255,255,255,0.06); color: #E8EDF5; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
-html[data-theme="dark"] .v-settings-tabs { border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-settings-tab { color: #5C6678; }
-html[data-theme="dark"] .v-settings-tab:hover { color: #9BA8BB; background: #0F1218; }
-html[data-theme="dark"] .v-settings-tab.active { color: #4B9FEA; border-bottom-color: #4B9FEA; background: rgba(75,159,234,0.12); }
-html[data-theme="dark"] .v-settings-card { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-filter-chip { background: #0F1218; border-color: rgba(255,255,255,0.06); color: #5C6678; }
-html[data-theme="dark"] .v-filter-chip:hover { color: #9BA8BB; border-color: rgba(255,255,255,0.12); }
-html[data-theme="dark"] .v-filter-chip.active { background: rgba(75,159,234,0.12); color: #4B9FEA; border-color: rgba(75,159,234,0.25); }
-html[data-theme="dark"] .v-type-btn { background: #0F1218; border-color: rgba(255,255,255,0.08); color: #5C6678; }
-html[data-theme="dark"] .v-toggle-wrapper { background: #0F1218; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-scope-btn { background: #0F1218; border-color: rgba(255,255,255,0.08); color: #E8EDF5; }
-html[data-theme="dark"] .v-scope-btn:hover { background: rgba(75,159,234,0.12); }
-html[data-theme="dark"] .v-date-input { background: #0F1218; border-color: rgba(255,255,255,0.10); color: #E8EDF5; }
-html[data-theme="dark"] .v-filter-bar { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-search-input { background: #0F1218; border-color: rgba(255,255,255,0.06); color: #E8EDF5; }
-html[data-theme="dark"] .v-search-clear { color: #3A4454; }
-html[data-theme="dark"] .v-search-clear:hover { color: #E8EDF5; }
-html[data-theme="dark"] .v-search-summary { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-label { color: #3A4454; }
-html[data-theme="dark"] .v-label-hi { color: #5C6678; }
-html[data-theme="dark"] .v-anomaly-badge { background: rgba(255,107,122,0.12); border-color: rgba(255,107,122,0.25); color: #FF6B7A; }
-html[data-theme="dark"] .v-danger-btn { background: rgba(255,107,122,0.12); border-color: rgba(255,107,122,0.25); }
-html[data-theme="dark"] .v-danger-btn:hover { background: rgba(255,107,122,0.20); }
-html[data-theme="dark"] .v-budget-alert { background: rgba(255,107,122,0.08); }
-html[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
-html[data-theme="dark"] .v-mobile-topbar { background: #0C0F14; border-bottom-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-mobile-bottom-nav { background: #0C0F14; border-top-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-mobile-nav-btn { color: #5C6678; }
-html[data-theme="dark"] .v-mobile-nav-btn.active { color: #4B9FEA; }
-html[data-theme="dark"] .v-kpi-premium { background: #141820; border-color: rgba(255,255,255,0.06); }
-html[data-theme="dark"] .v-kpi-premium:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-html[data-theme="dark"] .v-grade-badge { background: #0F1218; border-color: rgba(255,255,255,0.06); }
-`;
 
 // ─── Utilities ─────────────────────────────────────────────────────────────────
 const parseDate    = s  => new Date(s + "T12:00:00");
@@ -1396,7 +216,9 @@ async function loadLocalData() {
 }
 
 async function saveLocalData(payload) {
-  try { window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
+  try { window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (err) {
+    console.warn("[Vault] localStorage save failed:", err);
+  }
 }
 
 async function loadCloudData(userId) {
@@ -1509,7 +331,7 @@ function amountToCentDigits(v) {
 
 const blankForm = cats => ({
   type:"expense", amount:"", category:cats?.expense?.[0]||"Operations",
-  date:TODAY_STR, description:"", tags:"", recurring:false, recurringFreq:"monthly",
+  date:getTodayStr(), description:"", tags:"", recurring:false, recurringFreq:"monthly",
 });
 const formFromTx = tx => ({
   type:tx.type, amount:amountToCentDigits(tx.amount), category:tx.category,
@@ -1518,15 +340,11 @@ const formFromTx = tx => ({
 });
 
 // ─── Toast hook ────────────────────────────────────────────────────────────────
+let _toastId = 0;
 function useToast() {
-  const [toasts, setToasts] = useState([]);
-  const add = useCallback((msg, type="info", onUndo) => {
-    const id = Date.now();
-    setToasts(p => [...p, { id, msg, type, onUndo }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
-  }, []);
-  const remove = useCallback(id => setToasts(p => p.filter(t => t.id !== id)), []);
-  return { toasts, add, remove };
+  // Notifications removed — all addToast calls are silently swallowed
+  const noop = useCallback(() => {}, []);
+  return { toasts: [], add: noop, remove: noop };
 }
 
 // ─── Intelligence System ───────────────────────────────────────────────────────
@@ -1549,7 +367,7 @@ function buildIntelligenceMessages(monthIncome, monthExpenses, liquidity, runway
 
 // ─── Anomaly detection ─────────────────────────────────────────────────────────
 function detectAnomalies(chartData) {
-  if (chartData.length < 3) return [];
+  if (chartData.length < 6) return [];
   const anomalies = [];
   const expValues = chartData.map(d => d.Expenses).filter(v => v > 0);
   if (expValues.length < 2) return anomalies;
@@ -1564,18 +382,21 @@ function detectAnomalies(chartData) {
 
 // ─── Date Range Filter ────────────────────────────────────────────────────────
 function DateRangeFilter({ from, to, onFrom, onTo, onClear }) {
-  const dateStyle = {
-    background: "#FFFFFF",
-    border: "1.5px solid rgba(0,0,0,0.12)",
+  const [focusedField, setFocusedField] = useState(null);
+  const inputStyle = field => ({
+    background: T.bgCard,
+    border: `1.5px solid ${focusedField === field ? T.blue : T.border}`,
     padding: "8px 10px",
-    color: "#0A0C10",
+    color: T.text2,
     fontFamily: "'JetBrains Mono', monospace",
     fontSize: 10.5,
     letterSpacing: "0.04em",
-    colorScheme: "light",
+    colorScheme: T === DARK_T ? "dark" : "light",
     transition: "border-color 150ms",
     cursor: "pointer",
-  };
+    borderRadius: "5px",
+    outline: "none",
+  });
 
   return (
     <div className="v-date-range">
@@ -1583,18 +404,18 @@ function DateRangeFilter({ from, to, onFrom, onTo, onClear }) {
         type="date"
         value={from || ""}
         onChange={e => onFrom(e.target.value)}
-        style={dateStyle}
-        onFocus={e => e.target.style.borderColor = "#1A6FD4"}
-        onBlur={e => e.target.style.borderColor = "rgba(0,0,0,0.12)"}
+        style={inputStyle("from")}
+        onFocus={() => setFocusedField("from")}
+        onBlur={() => setFocusedField(null)}
       />
       <span style={{ color: T.text3, fontSize: 11, fontFamily:"'JetBrains Mono',monospace" }}>—</span>
       <input
         type="date"
         value={to || ""}
         onChange={e => onTo(e.target.value)}
-        style={dateStyle}
-        onFocus={e => e.target.style.borderColor = "#1A6FD4"}
-        onBlur={e => e.target.style.borderColor = "rgba(0,0,0,0.12)"}
+        style={inputStyle("to")}
+        onFocus={() => setFocusedField("to")}
+        onBlur={() => setFocusedField(null)}
       />
       {(from || to) && (
         <>
@@ -1670,65 +491,88 @@ function BudgetBar({ cat, spent, limit, fmt }) {
 }
 
 // ─── Transaction Feed ──────────────────────────────────────────────────────────
+// ─── Transaction Feed (Apple Wallet style) ─────────────────────────────────
 function TxFeed({ txs, onEdit, onDelete, fmt }) {
+  const [expandedId, setExpandedId] = useState(null);
+
   if (!txs.length) return <div className="v-empty">No records found</div>;
+
   const grouped = {};
   txs.forEach(tx => {
     if (!grouped[tx.date]) grouped[tx.date] = [];
     grouped[tx.date].push(tx);
   });
-  const dates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+  const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  function dayLabel(dateStr) {
+    const d = parseDate(dateStr);
+    const today     = new Date(); today.setHours(12,0,0,0);
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const target    = new Date(d);    target.setHours(12,0,0,0);
+    if (target.getTime() === today.getTime())     return "Today";
+    if (target.getTime() === yesterday.getTime()) return "Yesterday";
+    return d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" });
+  }
+
   return (
-    <div>
+    <div className="ldg-feed">
       {dates.map(date => {
         const dayTxs = grouped[date];
-        const dateObj = parseDate(date);
-        const dayInc = dayTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
-        const dayExp = dayTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+        const dayInc = dayTxs.filter(t=>t.type==="income"&&!t.transfer).reduce((s,t)=>s+t.amount,0);
+        const dayExp = dayTxs.filter(t=>t.type==="expense"&&!t.transfer).reduce((s,t)=>s+t.amount,0);
         const dayNet = dayInc - dayExp;
         return (
-          <div key={date} className="v-feed-group">
-            <div className="v-feed-date-row">
-              <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text2, letterSpacing:"0.1em" }}>
-                {dateObj.toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric", year:"numeric" }).toUpperCase()}
-              </span>
-              <div style={{ flex:1 }} />
-              <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9.5, color: dayNet >= 0 ? T.green : T.red, letterSpacing:"-0.02em" }}>
+          <div key={date} className="ldg-group">
+            <div className="ldg-date-header">
+              <span className="ldg-date-label">{dayLabel(date)}</span>
+              <span className="ldg-date-net" style={{ color: dayNet >= 0 ? T.green : T.red }}>
                 {dayNet >= 0 ? "+" : "−"}{fmt(Math.abs(dayNet))}
               </span>
-              <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:7.5, color:T.text3 }}>{dayTxs.length}TX</span>
             </div>
             {dayTxs.map(tx => {
-              const isInc = tx.type === "income";
-              const tags = tx.tags ? tx.tags.split(",").map(t=>t.trim()).filter(Boolean) : [];
+              const isInc      = tx.type === "income";
+              const isTransfer = tx.transfer === true;
+              const isExpanded = expandedId === tx.id;
+              const tags       = tx.tags ? tx.tags.split(",").map(t=>t.trim()).filter(Boolean) : [];
+              const avatarChar = isTransfer ? "⇄" : (tx.category || "?").charAt(0).toUpperCase();
+              const amtColor   = isTransfer ? T.text3 : isInc ? T.green : T.red;
+              const avatarBg   = isTransfer ? T.bgSubtle : isInc ? T.greenLight : T.redLight;
+              const avatarClr  = isTransfer ? T.text3   : isInc ? T.green      : T.red;
               return (
-                <div key={tx.id} className="v-feed-entry">
-                  <div className="v-feed-indicator" style={{ background: isInc ? `rgba(0,232,122,0.7)` : `rgba(255,127,159,0.5)` }} />
-                  <div className="v-feed-body">
-                    <span className="v-badge" style={{ background:isInc?T.greenLight:T.redLight, color:isInc?T.green:T.red }}>{tx.type}</span>
-                    <span style={{ fontSize:12, color:T.text2, minWidth:100 }}>{tx.category}</span>
-                    <span style={{ fontSize:11, color:T.text2, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                      {tx.description || <span style={{ color:T.text3 }}>—</span>}
-                    </span>
-                    <div style={{ display:"flex", gap:3 }}>
-                      {tags.slice(0,2).map((t,i) => <span key={i} className="v-tag">{t}</span>)}
+                <div key={tx.id} className={`ldg-row${isExpanded ? " expanded" : ""}`}
+                  onClick={() => setExpandedId(isExpanded ? null : tx.id)}>
+                  <div className="ldg-row-main">
+                    <div className="ldg-avatar" style={{ background: avatarBg, color: avatarClr }}>
+                      {avatarChar}
                     </div>
-                    {tx.recurring && !tx.isRecurringInstance && (
-                      <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:7, color:T.gold, letterSpacing:"0.14em", border:`1px solid rgba(226,201,131,0.2)`, padding:"2px 5px" }}>REC</span>
-                    )}
+                    <div className="ldg-meta">
+                      <span className="ldg-category">{isTransfer ? "Transfer" : tx.category}</span>
+                      {tx.description && <span className="ldg-desc">{tx.description}</span>}
+                    </div>
+                    <div className="ldg-amount" style={{ color: amtColor }}>
+                      {isTransfer ? "" : isInc ? "+" : "−"}{fmt(tx.amount)}
+                    </div>
                   </div>
-                  <div className="v-feed-amount" style={{ color: isInc ? T.green : T.red, paddingRight:80 }}>
-                    {isInc ? "+" : "−"}{fmt(tx.amount)}
-                  </div>
-                  <div className="v-feed-actions">
-                    {!tx.isRecurringInstance && (
-                      <button className="v-btn-ghost" onClick={e => { e.stopPropagation(); onEdit(tx); }}>EDIT</button>
-                    )}
-                    <button className="v-btn-ghost" onClick={e => { e.stopPropagation(); onDelete(tx); }}
-                      style={{ color:T.text3 }}
-                      onMouseEnter={e => e.currentTarget.style.color = T.red}
-                      onMouseLeave={e => e.currentTarget.style.color = T.text3}>DEL</button>
-                  </div>
+                  {isExpanded && (
+                    <div className="ldg-expand-panel" onClick={e => e.stopPropagation()}>
+                      {tags.length > 0 && (
+                        <div className="ldg-expand-tags">
+                          {tags.map((tag, i) => <span key={i} className="v-tag">{tag}</span>)}
+                        </div>
+                      )}
+                      {tx.recurring && !tx.isRecurringInstance && (
+                        <span className="ldg-rec-badge">REC</span>
+                      )}
+                      <div className="ldg-expand-actions">
+                        {!tx.isRecurringInstance && (
+                          <button className="v-btn-secondary ldg-action-btn"
+                            onClick={() => { setExpandedId(null); onEdit(tx); }}>Edit</button>
+                        )}
+                        <button className="v-btn-ghost ldg-delete-btn"
+                          onClick={() => { setExpandedId(null); onDelete(tx); }}>Delete</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1814,7 +658,7 @@ function TrendPill({ pct, invert = false }) {
 }
 
 // ─── Health Ring ───────────────────────────────────────────────────────────────
-function HealthRing({ score }) {
+function HealthRing({ score, onInfoClick }) {
   const color  = score >= 70 ? T.green : score >= 45 ? T.gold : T.red;
   const label  = score >= 70 ? "Strong" : score >= 45 ? "Stable" : "At Risk";
   const r = 30, circ = 2 * Math.PI * r, filled = (score / 100) * circ;
@@ -1835,83 +679,114 @@ function HealthRing({ score }) {
         <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", color:T.text3, marginBottom:5 }}>Health Score</div>
         <div style={{ fontFamily:"'Inter',sans-serif", fontSize:15, fontWeight:700, color, letterSpacing:"-0.01em" }}>{label}</div>
         <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text4, marginTop:3 }}>{score} / 100</div>
+        {onInfoClick && (
+          <button onClick={onInfoClick}
+            style={{ background:"none", border:"none", color:T.text3, fontSize:10, cursor:"pointer", padding:0, marginTop:4, textDecoration:"underline", fontFamily:"'Inter',sans-serif" }}>
+            How is this calculated?
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 // ─── Sparkline ─────────────────────────────────────────────────────────────────
-function Sparkline({ data = [], color = '#1A6FD4', height = 40, width = 80 }) {
+function Sparkline({ data = [], color = '#1B4FCC', height = 40, width = 80, fmt }) {
+  const [hovered, setHovered] = useState(null);
   if (!data || data.length < 2) return <div style={{ width, height }} />;
   const max = Math.max(...data, 1);
   const min = Math.min(...data, 0);
   const range = max - min || 1;
   const pad = 3;
   const w = width, h = height;
-  const pts = data.map((v, i) => {
-    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
-    const y = h - pad - ((v - min) / range) * (h - pad * 2);
-    return `${x},${y}`;
-  }).join(' ');
+  const coords = data.map((v, i) => ({
+    x: pad + (i / (data.length - 1)) * (w - pad * 2),
+    y: h - pad - ((v - min) / range) * (h - pad * 2),
+    v,
+  }));
+  const pts = coords.map(c => `${c.x},${c.y}`).join(' ');
+
+  const handleMouseMove = e => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const idx = Math.round((mx / w) * (data.length - 1));
+    const clamped = Math.max(0, Math.min(data.length - 1, idx));
+    setHovered({ ...coords[clamped], idx: clamped });
+  };
+
   return (
-    <svg width={w} height={h} style={{ display:'block', overflow:'visible' }}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5}
-        strokeLinecap="round" strokeLinejoin="round" opacity={0.8} />
-      {/* Last point dot */}
-      {data.length > 0 && (() => {
-        const last = data[data.length - 1];
-        const x = pad + ((data.length - 1) / (data.length - 1)) * (w - pad * 2);
-        const y = h - pad - ((last - min) / range) * (h - pad * 2);
-        return <circle cx={x} cy={y} r={2.5} fill={color} />;
-      })()}
-    </svg>
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <svg width={w} height={h} style={{ display:'block', overflow:'visible', cursor:'crosshair' }}
+        onMouseMove={handleMouseMove} onMouseLeave={() => setHovered(null)}>
+        <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5}
+          strokeLinecap="round" strokeLinejoin="round" opacity={0.8} />
+        {/* Last point dot (when not hovering) */}
+        {!hovered && (() => {
+          const last = coords[coords.length - 1];
+          return <circle cx={last.x} cy={last.y} r={2.5} fill={color} />;
+        })()}
+        {/* Hover marker */}
+        {hovered && (
+          <circle cx={hovered.x} cy={hovered.y} r={3} fill={color} opacity={1} />
+        )}
+      </svg>
+      {hovered && (
+        <div style={{
+          position: 'absolute', bottom: h + 6, left: Math.max(0, hovered.x - 28),
+          background: T.bgCard, border: `1px solid ${T.border}`,
+          borderRadius: 4, padding: '3px 7px', pointerEvents: 'none',
+          fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: T.text1,
+          whiteSpace: 'nowrap', boxShadow: T.shadowSm,
+          zIndex: 10,
+        }}>
+          {fmt ? fmt(hovered.v) : hovered.v}
+        </div>
+      )}
+    </div>
   );
 }
 
 // ─── Grade helper ──────────────────────────────────────────────────────────────
-function getGrade(type, value, extra = {}) {
-  if (value === null || value === undefined) return { grade:'—', color:'#9CA3AF', bg:'#F7F9FC', border:'rgba(0,0,0,0.1)', tip:'No data yet' };
+function getGrade(type, value) {
+  if (value === null || value === undefined) return { grade:'—', color:'#9CA3AF', bg:'#F8FAFC', border:'rgba(0,0,0,0.08)', tip:'No data yet' };
   const grades = {
     incomeGrowth: [
-      { min:10,  grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Income growing strongly' },
-      { min:3,   grade:'A',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Income trending up' },
-      { min:-3,  grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'Income holding steady' },
-      { min:-10, grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'Income slightly declining' },
-      { min:-Infinity, grade:'D', color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Income falling — investigate causes' },
+      { check: v => v >= 10,  grade:'A+', color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'Income growing strongly' },
+      { check: v => v >= 3,   grade:'A',  color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'Income trending up' },
+      { check: v => v >= -3,  grade:'B',  color:'#1B4FCC', bg:'#F0F4FF', border:'rgba(27,79,204,0.20)', tip:'Income holding steady' },
+      { check: v => v >= -10, grade:'C',  color:'#B8891A', bg:'#FBF6E8', border:'rgba(184,137,26,0.20)', tip:'Income slightly declining' },
+      { check: () => true,    grade:'D',  color:'#DC2626', bg:'#FFF1F2', border:'rgba(220,38,38,0.20)', tip:'Income falling — investigate causes' },
     ],
     spendControl: [
-      { min:-Infinity, grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Expenses dropping — excellent discipline', check: v => v <= -5 },
-      { min:-Infinity, grade:'A',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Expenses stable', check: v => v <= 5 },
-      { min:-Infinity, grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'Minor spend increase', check: v => v <= 15 },
-      { min:-Infinity, grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'Spend accelerating — review categories', check: v => v <= 25 },
-      { min:-Infinity, grade:'D',  color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Spend surge — immediate review needed', check: () => true },
+      { check: v => v <= -5,  grade:'A+', color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'Expenses dropping — excellent discipline' },
+      { check: v => v <= 5,   grade:'A',  color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'Expenses stable' },
+      { check: v => v <= 15,  grade:'B',  color:'#1B4FCC', bg:'#F0F4FF', border:'rgba(27,79,204,0.20)', tip:'Minor spend increase' },
+      { check: v => v <= 25,  grade:'C',  color:'#B8891A', bg:'#FBF6E8', border:'rgba(184,137,26,0.20)', tip:'Spend accelerating — review categories' },
+      { check: () => true,    grade:'D',  color:'#DC2626', bg:'#FFF1F2', border:'rgba(220,38,38,0.20)', tip:'Spend surge — immediate review needed' },
     ],
     savingsRate: [
-      { min:25, grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Excellent — saving >$1 of every $4' },
-      { min:15, grade:'A',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'Strong savings discipline' },
-      { min:5,  grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'Room to improve — target 15%+' },
-      { min:0,  grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'Barely breaking even this month' },
-      { min:-Infinity, grade:'F', color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Spending more than earning — critical' },
+      { check: v => v >= 25,  grade:'A+', color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'Excellent — saving >$1 of every $4' },
+      { check: v => v >= 15,  grade:'A',  color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'Strong savings discipline' },
+      { check: v => v >= 5,   grade:'B',  color:'#1B4FCC', bg:'#F0F4FF', border:'rgba(27,79,204,0.20)', tip:'Room to improve — target 15%+' },
+      { check: v => v >= 0,   grade:'C',  color:'#B8891A', bg:'#FBF6E8', border:'rgba(184,137,26,0.20)', tip:'Barely breaking even this month' },
+      { check: () => true,    grade:'F',  color:'#DC2626', bg:'#FFF1F2', border:'rgba(220,38,38,0.20)', tip:'Spending more than earning — critical' },
     ],
     runway: [
-      { min:365, grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'12+ months — highly secure position' },
-      { min:180, grade:'A',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'6–12 months — healthy buffer' },
-      { min:90,  grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'3–6 months — watch spending' },
-      { min:30,  grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'1–3 months — reduce burn urgently' },
-      { min:-Infinity, grade:'F', color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Under 30 days — critical action needed' },
+      { check: v => v >= 365, grade:'A+', color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'12+ months — highly secure position' },
+      { check: v => v >= 180, grade:'A',  color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'6–12 months — healthy buffer' },
+      { check: v => v >= 90,  grade:'B',  color:'#1B4FCC', bg:'#F0F4FF', border:'rgba(27,79,204,0.20)', tip:'3–6 months — watch spending' },
+      { check: v => v >= 30,  grade:'C',  color:'#B8891A', bg:'#FBF6E8', border:'rgba(184,137,26,0.20)', tip:'1–3 months — reduce burn urgently' },
+      { check: () => true,    grade:'F',  color:'#DC2626', bg:'#FFF1F2', border:'rgba(220,38,38,0.20)', tip:'Under 30 days — critical action needed' },
     ],
     budgetAdherence: [
-      { min:-Infinity, grade:'A+', color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)', tip:'All budgets under control', check: v => v === 0 },
-      { min:-Infinity, grade:'B',  color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)', tip:'1 category needs attention', check: v => v === 1 },
-      { min:-Infinity, grade:'C',  color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)', tip:'Multiple categories over budget', check: v => v <= 3 },
-      { min:-Infinity, grade:'D',  color:'#E53935', bg:'#FFF0F3', border:'rgba(229,57,53,0.3)', tip:'Budget discipline breakdown', check: () => true },
+      { check: v => v === 0,  grade:'A+', color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.20)', tip:'All budgets under control' },
+      { check: v => v === 1,  grade:'B',  color:'#1B4FCC', bg:'#F0F4FF', border:'rgba(27,79,204,0.20)', tip:'1 category needs attention' },
+      { check: v => v <= 3,   grade:'C',  color:'#B8891A', bg:'#FBF6E8', border:'rgba(184,137,26,0.20)', tip:'Multiple categories over budget' },
+      { check: () => true,    grade:'D',  color:'#DC2626', bg:'#FFF1F2', border:'rgba(220,38,38,0.20)', tip:'Budget discipline breakdown' },
     ],
   };
   const list = grades[type] || [];
-  if (type === 'spendControl' || type === 'budgetAdherence') {
-    return list.find(g => g.check?.(value)) || list[list.length - 1];
-  }
-  return list.find(g => value >= g.min) || list[list.length - 1];
+  return list.find(g => g.check(value)) ?? list[list.length - 1];
 }
 
 // ─── Priority actions ──────────────────────────────────────────────────────────
@@ -1965,50 +840,400 @@ function getPriorityActions({ monthIncome, monthExpenses, savingsRate, runwayDay
 }
 
 // ─── Toast Stack ───────────────────────────────────────────────────────────────
-function ToastStack({ toasts, remove }) {
-  if (!toasts.length) return null;
+function ToastStack() { return null; }
+
+// ─── Animated Number Hook (Phase 2) ──────────────────────────────────────────
+function useAnimatedNumber(value, duration = 600) {
+  const [displayed, setDisplayed] = useState(value);
+  const [animating, setAnimating] = useState(false);
+  const prevRef = useRef(value);
+  const rafRef  = useRef(null);
+
+  useEffect(() => {
+    const from = prevRef.current;
+    const to   = value;
+    if (from === to) return;
+    prevRef.current = to;
+
+    const start = performance.now();
+    setAnimating(true);
+
+    const tick = (now) => {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayed(from + (to - from) * eased);
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        setDisplayed(to);
+        setAnimating(false);
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [value, duration]);
+
+  return { displayed, animating };
+}
+
+// ─── New Transaction View (Phase 1) ───────────────────────────────────────────
+function NewTransactionView({ cats, form, setForm, onCommit, onCancel, editId, fmt, amountDisplay, theme }) {
+  const isIncome  = form.type === "income";
+  const amountVal = parseInt(form.amount || "0", 10);
+
   return (
-    <div className="v-toast-stack">
-      {toasts.map(t => (
-        <div key={t.id} className="v-toast">
-          <div style={{ width:2, height:28, background: t.type==="ok"?T.green:t.type==="err"?T.red:T.blue, flexShrink:0 }} />
-          <span style={{ flex:1, color:T.text1, fontSize:11 }}>{t.msg}</span>
-          {t.onUndo && (
-            <button onClick={() => { t.onUndo(); remove(t.id); }}
-              style={{ background:"rgba(0,0,0,0.04)", border:`1px solid rgba(0,0,0,0.10)`, color:T.text2, fontSize:7.5, fontWeight:400, letterSpacing:"0.18em", padding:"3px 8px", fontFamily:"'JetBrains Mono',monospace" }}>
-              UNDO
-            </button>
-          )}
-          <button onClick={() => remove(t.id)}
-            style={{ background:"none", border:"none", color:T.text2, fontSize:16, lineHeight:1, padding:"0 0 0 4px" }}>×</button>
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 900,
+      background: T.bg,
+      display: "flex", flexDirection: "column",
+      fontFamily: "'Inter', sans-serif",
+      animation: "ntv-in 200ms cubic-bezier(0.16,1,0.3,1) both",
+    }}>
+      <style>{`
+        @keyframes ntv-in {
+          from { opacity:0; transform: translateY(12px); }
+          to   { opacity:1; transform: translateY(0); }
+        }
+        .ntv-type-btn {
+          flex:1; padding:10px 0; border:1px solid ${T.border};
+          background: none; color: ${T.text3};
+          font-family:'Inter',sans-serif; font-size:11px;
+          font-weight:600; letter-spacing:0.08em; text-transform:uppercase;
+          cursor:pointer; transition: all 150ms ease;
+        }
+        .ntv-type-btn.active-income {
+          background: ${T.greenLight}; color: ${T.green};
+          border-color: ${T.green}; z-index:1;
+        }
+        .ntv-type-btn.active-expense {
+          background: ${T.redLight}; color: ${T.red};
+          border-color: ${T.red}; z-index:1;
+        }
+        .ntv-type-btn:first-child { border-radius: 6px 0 0 6px; }
+        .ntv-type-btn:last-child  { border-radius: 0 6px 6px 0; margin-left:-1px; }
+        .ntv-field-label {
+          display:block; font-size:10px; font-weight:500;
+          letter-spacing:0.06em; text-transform:uppercase;
+          color:${T.text4}; margin-bottom:7px;
+        }
+        .ntv-input {
+          width:100%; background:${T.bgSubtle};
+          border:1.5px solid ${T.border};
+          border-radius:6px; padding:10px 13px;
+          color:${T.text1}; font-size:13px;
+          font-family:inherit; outline:none;
+          transition:border-color 150ms;
+          box-sizing:border-box;
+        }
+        .ntv-input:focus { border-color:${T.borderMid}; background:${T.bgCard}; }
+        .ntv-select { appearance:none; cursor:pointer; }
+        .ntv-amount-display {
+          width:100%; background:${T.bgSubtle};
+          border:1.5px solid transparent;
+          border-radius:6px; padding:22px 16px 18px;
+          font-family:'JetBrains Mono',monospace;
+          font-size:52px; font-weight:400; letter-spacing:-0.05em;
+          text-align:center; outline:none; box-sizing:border-box;
+          caret-color:transparent; transition:border-color 150ms, color 150ms;
+          display:block;
+        }
+        .ntv-amount-display:focus { background:${T.bgCard}; border-color:${T.borderMid}; }
+        .ntv-hint {
+          font-family:'JetBrains Mono',monospace;
+          font-size:9px; letter-spacing:0.08em;
+          text-transform:uppercase; color:${T.text4};
+          text-align:center; margin-top:7px;
+        }
+        .ntv-toggle-row {
+          display:flex; align-items:center;
+          justify-content:space-between; padding:14px 0;
+          border-top:1px solid ${T.border};
+        }
+        .ntv-toggle {
+          position:relative; width:38px; height:20px;
+          background:none; border:1px solid ${T.border};
+          border-radius:12px; cursor:pointer; padding:0;
+          transition:border-color 150ms;
+        }
+        .ntv-toggle-thumb {
+          position:absolute; top:2px; width:14px; height:14px;
+          border-radius:50%; transition:left 150ms;
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        padding:"20px 32px", borderBottom:`1px solid ${T.border}`, flexShrink:0,
+      }}>
+        <div>
+          <div style={{ fontSize:10, fontWeight:500, letterSpacing:"0.08em", textTransform:"uppercase", color:T.text4, marginBottom:4 }}>
+            {editId ? "Edit Financial Event" : "Record Financial Event"}
+          </div>
+          <div style={{ fontSize:18, fontWeight:400, letterSpacing:"-0.03em", color:T.text1 }}>
+            {editId ? "Modify Transaction" : "New Transaction"}
+          </div>
         </div>
-      ))}
+        <button onClick={onCancel} style={{
+          background:"none", border:"none", padding:8,
+          color:T.text3, cursor:"pointer", borderRadius:6,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          transition:"color 150ms",
+        }}
+          onMouseEnter={e=>e.currentTarget.style.color=T.text1}
+          onMouseLeave={e=>e.currentTarget.style.color=T.text3}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Body — centered column */}
+      <div style={{
+        flex:1, overflowY:"auto", display:"flex",
+        justifyContent:"center", padding:"40px 24px 40px",
+      }}>
+        <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column", gap:24 }}>
+
+          {/* Type toggle */}
+          <div style={{ display:"flex" }}>
+            {["expense","income"].map(t => (
+              <button key={t}
+                className={`ntv-type-btn${form.type===t?" active-"+t:""}`}
+                onClick={() => setForm(f => ({ ...f, type:t, category: t==="income"?cats.income[0]:cats.expense[0] }))}
+              >
+                {t === "expense" ? "Expense" : "Income"}
+              </button>
+            ))}
+          </div>
+
+          {/* Amount */}
+          <div>
+            <input
+              type="text" inputMode="numeric" autoFocus
+              value={amountDisplay}
+              className="ntv-amount-display"
+              style={{ color: amountVal===0 ? T.text4 : isIncome ? T.green : T.red }}
+              onChange={e => {
+                const digits = e.target.value.replace(/[^0-9]/g,"");
+                if (digits !== (form.amount||"")) setForm(f=>({...f,amount:digits.slice(0,10)}));
+              }}
+              onPaste={e => {
+                e.preventDefault();
+                const text = e.clipboardData.getData("text");
+                const numeric = text.replace(/[^0-9.]/g,"");
+                const dollars = parseFloat(numeric);
+                if (Number.isFinite(dollars)) setForm(f=>({...f,amount:String(Math.round(dollars*100)).slice(0,10)}));
+              }}
+              onKeyDown={e => {
+                if (e.key>="0"&&e.key<="9") { e.preventDefault(); setForm(f=>({...f,amount:(f.amount+e.key).slice(0,10)})); }
+                else if (e.key==="Backspace"||e.key==="Delete") { e.preventDefault(); setForm(f=>({...f,amount:f.amount.slice(0,-1)})); }
+                else if (e.key==="Enter") { e.preventDefault(); onCommit(); }
+              }}
+            />
+            <div className="ntv-hint">Type digits · Backspace to clear</div>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="ntv-field-label">Category</label>
+            <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
+              className="ntv-input ntv-select">
+              {cats[form.type].map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* Two-col: date + description */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+            <div>
+              <label className="ntv-field-label">Date</label>
+              <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}
+                className="ntv-input" style={{ fontFamily:"'JetBrains Mono',monospace", colorScheme: theme==="dark"?"dark":"light" }} />
+            </div>
+            <div>
+              <label className="ntv-field-label">Tags</label>
+              <input type="text" placeholder="client-a, q3" value={form.tags}
+                onChange={e=>setForm(f=>({...f,tags:e.target.value}))}
+                className="ntv-input" />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="ntv-field-label">Memo</label>
+            <input type="text" placeholder="Brief description…" value={form.description}
+              onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+              onKeyDown={e=>e.key==="Enter"&&onCommit()}
+              className="ntv-input" />
+          </div>
+
+          {/* Recurring toggle */}
+          <div>
+            <div className="ntv-toggle-row">
+              <div>
+                <div style={{ fontSize:13, color:T.text1, fontWeight:400, letterSpacing:"-0.01em" }}>Recurring Entry</div>
+                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9.5, color:T.text3, marginTop:3, letterSpacing:"0.04em" }}>Projects forward automatically</div>
+              </div>
+              <button className="ntv-toggle" onClick={()=>setForm(f=>({...f,recurring:!f.recurring}))}
+                style={{ borderColor:form.recurring?T.blue:T.border }}>
+                <div className="ntv-toggle-thumb" style={{ left:form.recurring?20:2, background:form.recurring?T.blue:T.text3 }} />
+              </button>
+            </div>
+            {form.recurring && (
+              <div style={{ marginTop:12 }}>
+                <label className="ntv-field-label">Frequency</label>
+                <select value={form.recurringFreq} onChange={e=>setForm(f=>({...f,recurringFreq:e.target.value}))}
+                  className="ntv-input ntv-select" style={{ fontSize:12 }}>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display:"flex", gap:10, paddingTop:8 }}>
+            <button onClick={onCancel} style={{
+              flex:1, padding:"12px 0",
+              background:"none", border:`1px solid ${T.border}`,
+              borderRadius:6, color:T.text2,
+              fontSize:12, fontWeight:600, letterSpacing:"0.04em",
+              cursor:"pointer", transition:"all 150ms",
+            }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=T.borderMid;e.currentTarget.style.color=T.text1;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text2;}}
+            >Cancel</button>
+            <button onClick={onCommit} style={{
+              flex:2, padding:"12px 0",
+              background:isIncome?T.green:T.blue,
+              border:"none", borderRadius:6, color:"#fff",
+              fontSize:12, fontWeight:600, letterSpacing:"0.04em",
+              cursor:"pointer", transition:"opacity 150ms",
+            }}
+              onMouseEnter={e=>e.currentTarget.style.opacity="0.88"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}
+            >{editId ? "Save Changes" : isIncome ? "Record Income" : "Record Expense"}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Animated Capital Display (Phase 2) ───────────────────────────────────────
+function AnimatedCapital({ value, fmt, fontSize = 56, style = {}, duration = 700 }) {
+  const { displayed, animating } = useAnimatedNumber(value, duration);
+  const prevVal = useRef(value);
+  const dirRef  = useRef(0);
+  useEffect(() => {
+    if (prevVal.current !== value) {
+      dirRef.current = value > prevVal.current ? 1 : -1;
+      prevVal.current = value;
+    }
+  }, [value]);
+
+  const tintColor = !animating ? T.text1
+    : dirRef.current === 1 ? T.green
+    : T.red;
+
+  return (
+    <div style={{
+      fontFamily: "'JetBrains Mono',monospace",
+      fontSize,
+      fontWeight: 400,
+      letterSpacing: "-0.06em",
+      lineHeight: 1,
+      color: tintColor,
+      transition: "color 500ms ease",
+      ...style,
+    }}>
+      {fmt(displayed)}
+    </div>
+  );
+}
+
+// ─── Animated Signed Value — for income/expense/net with sign prefix ──────────
+function AnimatedValue({ value, fmt, fSign, signed = false, fontSize = 20, color, style = {}, duration = 600 }) {
+  const { displayed, animating } = useAnimatedNumber(value, duration);
+  const prevVal = useRef(value);
+  const dirRef  = useRef(0);
+  useEffect(() => {
+    if (prevVal.current !== value) {
+      dirRef.current = value > prevVal.current ? 1 : -1;
+      prevVal.current = value;
+    }
+  }, [value]);
+
+  // During animation briefly pulse brighter, then settle to the passed color
+  const resolvedColor = animating
+    ? (dirRef.current === 1 ? T.green : T.red)
+    : (color || T.text1);
+
+  return (
+    <div style={{
+      fontFamily: "'JetBrains Mono',monospace",
+      fontSize,
+      fontWeight: 400,
+      letterSpacing: "-0.04em",
+      lineHeight: 1,
+      color: resolvedColor,
+      transition: "color 500ms ease",
+      ...style,
+    }}>
+      {signed
+        ? (displayed >= 0 ? "+" : "−") + fmt(Math.abs(displayed))
+        : fmt(displayed)}
     </div>
   );
 }
 
 // ─── Nav Icons ─────────────────────────────────────────────────────────────────
 const NavIcons = {
-  overview: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><rect x="3" y="3" width="8" height="9"/><rect x="13" y="3" width="8" height="5"/><rect x="13" y="11" width="8" height="10"/><rect x="3" y="15" width="8" height="6"/></svg>),
-  calendar: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><rect x="3" y="4" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>),
-  ledger:   (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>),
+  overview: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path fillRule="evenodd" clipRule="evenodd" d="M5 22C3.34315 22 2 20.6569 2 19V5C2 3.34315 3.34315 2 5 2H19C20.6569 2 22 3.34315 22 5V19C22 20.6569 20.6569 22 19 22H5ZM5 4C4.44772 4 4 4.44772 4 5V8H20V5C20 4.44772 19.5523 4 19 4H5ZM8 10H4V19C4 19.5523 4.44772 20 5 20H8V10ZM10 20V10H20V19C20 19.5523 19.5523 20 19 20H10Z" fill="currentColor"/>
+    </svg>
+  ),
+  calendar: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path fillRule="evenodd" clipRule="evenodd" d="M17 2C17 1.44772 16.5523 1 16 1C15.4477 1 15 1.44772 15 2V3H9V2C9 1.44772 8.55228 1 8 1C7.44772 1 7 1.44772 7 2V3H5C3.34315 3 2 4.34315 2 6V20C2 21.6569 3.34315 23 5 23H19C20.6569 23 22 21.6569 22 20V6C22 4.34315 20.6569 3 19 3H17V2ZM20 9V6C20 5.44772 19.5523 5 19 5H17V6C17 6.55228 16.5523 7 16 7C15.4477 7 15 6.55228 15 6V5H9V6C9 6.55228 8.55228 7 8 7C7.44772 7 7 6.55228 7 6V5H5C4.44772 5 4 5.44772 4 6V9H20ZM4 11H20V20C20 20.5523 19.5523 21 19 21H5C4.44772 21 4 20.5523 4 20V11Z" fill="currentColor"/>
+    </svg>
+  ),
+  ledger: (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17 21C17 21.5523 17.4477 22 18 22C18.5523 22 19 21.5523 19 21V3C19 2.44772 18.5523 2 18 2C17.4477 2 17 2.44772 17 3V21Z" fill="currentColor"/>
+      <path d="M13 21C13 21.5523 13.4477 22 14 22C14.5523 22 15 21.5523 15 21V7C15 6.44772 14.5523 6 14 6C13.4477 6 13 6.44772 13 7V21Z" fill="currentColor"/>
+      <path d="M5 21C5 21.5523 5.44772 22 6 22C6.55228 22 7 21.5523 7 21V15C7 14.4477 6.55228 14 6 14C5.44772 14 5 14.4477 5 15V21Z" fill="currentColor"/>
+      <path d="M10 22C9.44772 22 9 21.5523 9 21V11C9 10.4477 9.44772 10 10 10C10.5523 10 11 10.4477 11 11V21C11 21.5523 10.5523 22 10 22Z" fill="currentColor"/>
+    </svg>
+  ),
+  goals:    (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>),
+  investments: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>),
+  banks: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7" />
+      <path d="M5 10v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9" />
+      <path d="M9 21v-7h6v7" />
+    </svg>
+  ),
   settings: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>),
-  mission:  (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="3" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/></svg>),
 };
 
 // ─── Main App ──────────────────────────────────────────────────────────────────
 export default function Vault() {
   // ─── Theme ────────────────────────────────────────────────────────────────
-  const [theme, setTheme] = useState(() => localStorage.getItem('vault_theme') || 'light');
-  // Mutate module-level T so all sub-components (defined outside this fn) get the correct theme colors
+  const { theme, setTheme } = useTheme();
+  // Sync module-level T so module-scoped sub-components get the correct theme colors
   Object.assign(T, theme === 'dark' ? DARK_T : LIGHT_T);
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
 
   const [session,      setSession]      = useState(null);
   const [user,         setUser]         = useState(null);
   const [authReady,    setAuthReady]    = useState(false);
+  const [showAuth,     setShowAuth]     = useState(false);
+  const [authIntent,   setAuthIntent]   = useState(null);
 
   const [txs,        setTxs]        = useState([]);
   const [baseLiq,    setBaseLiq]    = useState(0);
@@ -2017,11 +1242,27 @@ export default function Vault() {
   const currency = "USD";
   const [loaded,     setLoaded]     = useState(false);
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('vault_sidebar_collapsed') === 'true');
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [menuCoords,      setMenuCoords]      = useState({ bottom: 0, left: 0 });
+  const avatarBtnRef     = useRef(null);
+  const popoverPortalRef = useRef(null);
+  useEffect(() => {
+    if (!showAccountMenu) return;
+    const handler = (e) => {
+      if (avatarBtnRef.current?.contains(e.target)) return;
+      if (popoverPortalRef.current?.contains(e.target)) return;
+      setShowAccountMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showAccountMenu]);
   const [view,          setView]          = useState("overview");
   const [modal,         setModal]         = useState(null);
+  
   const [editId,        setEditId]        = useState(null);
   const [form,          setForm]          = useState(null);
-  const [period,        setPeriod]        = useState({ m:TODAY.getMonth(), y:TODAY.getFullYear() });
+  const [period,        setPeriod]        = useState(() => { const d = getToday(); return { m:d.getMonth(), y:d.getFullYear() }; });
   const [chartMode,     setChartMode]     = useState("monthly");
   const [txFilter,      setTxFilter]      = useState("all");
   const [ledgerSearch,  setLedgerSearch]  = useState("");
@@ -2034,6 +1275,7 @@ export default function Vault() {
   const [settingsTab,   setSettingsTab]   = useState("data");
   const [showProjected, setShowProjected] = useState(false);
   const [accountEmail,  setAccountEmail]  = useState("");
+  const [calcContext, setCalcContext] = useState(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [notifications, setNotifications]           = useState([]);
   const [showNotifications, setShowNotifications]   = useState(false);
@@ -2043,9 +1285,20 @@ export default function Vault() {
   });
   useEffect(() => { try { localStorage.setItem("vault:goals", JSON.stringify(goals)); } catch {} }, [goals]);
 
+  // Phase 1: New transaction full-screen view
+  const [newTxView, setNewTxView] = useState(false); // replaces drawer for "+" button
+
   const { toasts, add:addToast, remove:removeToast } = useToast();
   const { fmt, fSign } = useMemo(() => makeFmt("USD"), []);
   const { tier, daysRemaining, trialExpired, isPaid, trialReady } = useTrialState(accountEmail, session);
+  
+  const {
+    items: plaidItems,
+    importedTxs,
+    syncing: plaidSyncing,
+    triggerSync,
+    refetch: refetchPlaid,
+  } = usePlaidAccounts(session);
 
   useEffect(() => {
     let mounted = true;
@@ -2104,7 +1357,7 @@ export default function Vault() {
         setCustomCats(d.customCats);
         setForm(blankForm({ expense:[...DEFAULT_CATS.expense,...(d.customCats.expense||[])], income:[...DEFAULT_CATS.income,...(d.customCats.income||[])] }));
       } catch (e) {
-        console.error("[Vault]", e);
+        console.error("[Grape]", e);
         if (!disposed) {
           addToast("Sync failed. Using local data.", "err");
           // Fallback: load local data so the form is always initialized
@@ -2137,51 +1390,40 @@ export default function Vault() {
   const resetPw = useCallback(async email => { if (!supabase) throw new Error("No supabase"); const { error } = await supabase.auth.resetPasswordForEmail(email); if (error) throw error; }, []);
   const signOut = useCallback(async () => { if (!supabase) return; const { error } = await supabase.auth.signOut(); if (error) throw error; }, []);
 
-  useEffect(() => {
-    const h = e => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowCommandPalette(s => !s);
-        return;
-      }
-      if (modal || scopeAction) return;
-      const tag = document.activeElement?.tagName?.toLowerCase();
-      if (["input","textarea","select"].includes(tag)) return;
-      const quickAdd = () => { setEditId(null); setForm(blankForm(cats)); setModal("tx"); };
-      const map = {
-        n:quickAdd, N:quickAdd,
-        l:()=>setView("ledger"),   L:()=>setView("ledger"),
-        o:()=>setView("overview"), O:()=>setView("overview"),
-        c:()=>setView("calendar"), C:()=>setView("calendar"),
-        m:()=>setView("mission"),  M:()=>setView("mission"),
-      };
-      if (map[e.key]) { map[e.key](); return; }
-      if (e.key === "ArrowLeft")  goPrev();
-      if (e.key === "ArrowRight") goNext();
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [modal, scopeAction, cats]);
-
   const goPrev = () => setPeriod(p => { const d=new Date(p.y,p.m-1,1); return {m:d.getMonth(),y:d.getFullYear()}; });
   const goNext = () => setPeriod(p => { const d=new Date(p.y,p.m+1,1); return {m:d.getMonth(),y:d.getFullYear()}; });
 
   // Derived
-  const monthTxs      = useMemo(() => txsForMonth(txs, period.y, period.m), [txs, period]);
-  const monthIncome   = useMemo(() => monthTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0), [monthTxs]);
-  const monthExpenses = useMemo(() => monthTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0), [monthTxs]);
+  const monthTxs = useMemo(() => txsForMonth(txs, period.y, period.m), [txs, period]);
+
+  // Imported (Plaid) txs for current month.
+  // Transfers excluded — they move money between accounts, not income or expense.
+  const importedMonthTxsNorm = useMemo(() => {
+    return importedTxs
+      .filter(t => !t.hidden && !t.transfer)
+      .filter(t => { const d = new Date(t.date + "T00:00:00"); return d.getFullYear() === period.y && d.getMonth() === period.m; });
+  }, [importedTxs, period]);
+
+  // All txs for current month — manual + Plaid
+  const allMonthTxs = useMemo(() => [...monthTxs, ...importedMonthTxsNorm], [monthTxs, importedMonthTxsNorm]);
+
+  const monthIncome   = useMemo(() => allMonthTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0), [allMonthTxs]);
+  const monthExpenses = useMemo(() => allMonthTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0), [allMonthTxs]);
   const monthNet      = monthIncome - monthExpenses;
-  const allTimeNet    = useMemo(() => txs.reduce((s,t)=>t.type==="income"?s+t.amount:s-t.amount,0), [txs]);
-  const liquidity     = baseLiq + allTimeNet;
+
+  // allTimeNet uses manual txs only — baseLiq already reflects historical bank balance,
+  // so adding Plaid's full history would double-count. Plaid data feeds monthly burn/income only.
+  const allTimeNet = useMemo(() => txs.reduce((s,t)=>t.type==="income"?s+t.amount:s-t.amount,0), [txs]);
+  const liquidity  = baseLiq + allTimeNet;
 
   const recentActivityTxs = useMemo(() => {
-    if (!monthTxs.length) return [];
-    const uniqueDates = [...new Set(monthTxs.map(t => t.date))].sort((a, b) => b.localeCompare(a));
+    if (!allMonthTxs.length) return [];
+    const uniqueDates = [...new Set(allMonthTxs.map(t => t.date))].sort((a, b) => b.localeCompare(a));
     const recentDates = new Set(uniqueDates.slice(0, 2));
-    return monthTxs
+    return allMonthTxs
       .filter(t => recentDates.has(t.date))
       .sort((a, b) => parseDate(b.date) - parseDate(a.date));
-  }, [monthTxs]);
+  }, [allMonthTxs]);
 
   const runwayDisplay = useMemo(() => {
     if (monthExpenses <= 0 || liquidity <= 0) return null;
@@ -2190,9 +1432,15 @@ export default function Vault() {
 
   const catBreakdown = useMemo(() => {
     const acc = {};
-    monthTxs.filter(t=>t.type==="expense").forEach(t => { acc[t.category]=(acc[t.category]||0)+t.amount; });
+    allMonthTxs.filter(t=>t.type==="expense").forEach(t => { acc[t.category]=(acc[t.category]||0)+t.amount; });
     return Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  }, [monthTxs]);
+  }, [allMonthTxs]);
+
+  const incomeCatBreakdown = useMemo(() => {
+    const acc = {};
+    allMonthTxs.filter(t=>t.type==="income").forEach(t => { acc[t.category]=(acc[t.category]||0)+t.amount; });
+    return Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  }, [allMonthTxs]);
 
   const budgetAlerts = useMemo(() =>
     catBreakdown.filter(([cat,spent])=>budgets[cat]&&spent>=budgets[cat]*0.8)
@@ -2213,7 +1461,7 @@ export default function Vault() {
     }), [txs, period.y]);
 
   const yearlyChartData = useMemo(() => {
-    const years = new Set([...txs.map(txYear), TODAY.getFullYear()]);
+    const years = new Set([...txs.map(txYear), getToday().getFullYear()]);
     return [...years].sort().map(y => {
       const flat = MONTHS_SHORT.flatMap((_,i) => txsForMonth(txs,y,i));
       return { name:String(y), Income:precise(flat.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0)), Expenses:precise(flat.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0)) };
@@ -2224,8 +1472,8 @@ export default function Vault() {
   const anomalies = useMemo(() => detectAnomalies(chartData), [chartData]);
 
   const intelMsgs = useMemo(() =>
-    buildIntelligenceMessages(monthIncome, monthExpenses, liquidity, runwayDisplay, monthTxs, budgetAlerts),
-    [monthIncome, monthExpenses, liquidity, runwayDisplay, monthTxs, budgetAlerts]);
+    buildIntelligenceMessages(monthIncome, monthExpenses, liquidity, runwayDisplay, allMonthTxs, budgetAlerts),
+    [monthIncome, monthExpenses, liquidity, runwayDisplay, allMonthTxs, budgetAlerts]);
 
   // ── Premium metrics: previous month, MoM trends, savings rate, health score ──
   const prevMonthTxs = useMemo(() => {
@@ -2280,6 +1528,15 @@ export default function Vault() {
     };
   }, [txs, period]);
 
+  // ── Chart momentum direction (last 3 months net trend) ──
+  const chartMomentum = useMemo(() => {
+    const last3 = sparklineData.net.slice(-3);
+    const pos = last3.filter(v => v > 0).length;
+    if (pos === 3) return "up";
+    if (pos === 0) return "down";
+    return "mixed";
+  }, [sparklineData]);
+
   // ── Financial velocity (net trend vs 3 months ago) ──
   const financialVelocity = useMemo(() => {
     const currentNet = monthIncome - monthExpenses;
@@ -2324,30 +1581,98 @@ export default function Vault() {
   });
   const earnedBadges = useMemo(() => {
     const badges = [];
-    if (txs.length >= 1)           badges.push({ id:'first-tx',      icon:'🏦', label:'First Transaction', color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)' });
-    if (monthIncome > monthExpenses && monthExpenses > 0) badges.push({ id:'profitable',   icon:'📈', label:'Profitable Month',  color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)' });
-    if (runwayDaysNum !== null && runwayDaysNum >= 180)   badges.push({ id:'runway-6mo',   icon:'🚀', label:'6 Months Runway',   color:'#00B876', bg:'#EDFBF4', border:'rgba(0,184,118,0.3)' });
-    else if (runwayDaysNum !== null && runwayDaysNum >= 90) badges.push({ id:'runway-3mo', icon:'🛡️', label:'3 Months Runway',   color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)' });
-    if (liquidity >= 10000)        badges.push({ id:'10k-capital',   icon:'💰', label:'$10k Capital',       color:'#E8A020', bg:'#FFF8E6', border:'rgba(232,160,32,0.3)' });
-    if (!budgetAlerts.some(a=>a.over) && Object.keys(budgets).length >= 2) badges.push({ id:'budget-clean', icon:'🎯', label:'Budget Discipline', color:'#1A6FD4', bg:'#EBF3FF', border:'rgba(26,111,212,0.3)' });
+    if (txs.length >= 1)           badges.push({ id:'first-tx',      icon:'◆', label:'First Transaction', color:'#1B4FCC', bg:'#F0F4FF', border:'rgba(27,79,204,0.18)' });
+    if (monthIncome > monthExpenses && monthExpenses > 0) badges.push({ id:'profitable',   icon:'↑', label:'Profitable Month',  color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.18)' });
+    if (runwayDaysNum !== null && runwayDaysNum >= 180)   badges.push({ id:'runway-6mo',   icon:'◈', label:'6 Months Runway',   color:'#059669', bg:'#F0FDF4', border:'rgba(5,150,105,0.18)' });
+    else if (runwayDaysNum !== null && runwayDaysNum >= 90) badges.push({ id:'runway-3mo', icon:'◈', label:'3 Months Runway',   color:'#B8891A', bg:'#FBF6E8', border:'rgba(184,137,26,0.18)' });
+    if (liquidity >= 10000)        badges.push({ id:'10k-capital',   icon:'◆', label:'$10k Capital',       color:'#B8891A', bg:'#FBF6E8', border:'rgba(184,137,26,0.18)' });
+    if (!budgetAlerts.some(a=>a.over) && Object.keys(budgets).length >= 2) badges.push({ id:'budget-clean', icon:'✓', label:'Budget Discipline', color:'#1B4FCC', bg:'#F0F4FF', border:'rgba(27,79,204,0.18)' });
     return badges.filter(b => !dismissedBadges.has(b.id));
   }, [txs, monthIncome, monthExpenses, runwayDaysNum, liquidity, budgetAlerts, budgets, dismissedBadges]);
 
-  const [expandedGrade, setExpandedGrade] = useState(null);
+  // ── Retention: milestone badge toasts ──
+  useEffect(() => {
+    earnedBadges.forEach(badge => {
+      const key = `vault:badge:shown:${badge.id}`;
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, '1');
+        addToast(`${badge.icon} ${badge.label} — milestone earned`, 'ok');
+      }
+    });
+  }, [earnedBadges]);
+
+  // ── Retention: daily streak ──
+  const streakDays = useMemo(() => {
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const ds = d.toISOString().split("T")[0];
+      if (txs.some(t => t.date === ds)) streak++;
+      else if (i > 0) break;
+    }
+    return streak;
+  }, [txs]);
+
+  // --- ISDARK Addition
+  const [isDark, setIsDark] = useState(() => {
+    return document.documentElement.getAttribute("data-theme") === "dark";
+  });
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const theme = document.documentElement.getAttribute("data-theme");
+      setIsDark(theme === "dark");
+    });
+  
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+  
+    return () => observer.disconnect();
+  }, []);
+
+  // ── Retention: daily check-in nudge ──
+  const [lastVisitDate, setLastVisitDate] = useState(
+    () => localStorage.getItem('vault:lastVisit') || ''
+  );
+  const isNewDay = lastVisitDate !== getTodayStr();
+  useEffect(() => {
+    if (isNewDay) {
+      const todayStr = getTodayStr();
+      localStorage.setItem('vault:lastVisit', todayStr);
+      setLastVisitDate(todayStr);
+    }
+  }, []);
+
+  const [expandedTimelineDay, setExpandedTimelineDay] = useState(null);
 
   const calMap = useMemo(() => {
     const m = {};
-    monthTxs.forEach(t => {
+    allMonthTxs.forEach(t => {
       const d=txDay(t);
       if (!m[d]) m[d]={income:0,expense:0,txs:[]};
       if(t.type==="income")m[d].income+=t.amount; else m[d].expense+=t.amount;
       m[d].txs.push(t);
     });
     return m;
-  }, [monthTxs]);
+  }, [allMonthTxs]);
 
   const ledgerTxs = useMemo(() => {
-    let list = txFilter==="all" ? [...txs] : txs.filter(t=>t.type===txFilter);
+    const manualTxsFiltered =
+      txFilter === "all" ? [...txs] : txs.filter(t => t.type === txFilter);
+  
+    const importedFiltered = importedTxs.filter(t =>
+      !t.hidden && !t.transfer &&
+      (txFilter === "all" || t.type === txFilter)
+    );
+  
+    const merged = [...manualTxsFiltered, ...importedFiltered];
+  
+    let list = merged;
+  
     if (ledgerSearch.trim()) {
       const q = ledgerSearch.trim().toLowerCase();
       list = list.filter(t =>
@@ -2357,10 +1682,12 @@ export default function Vault() {
         String(t.amount).includes(q)
       );
     }
+  
     if (ledgerFrom) list = list.filter(t => t.date >= ledgerFrom);
     if (ledgerTo)   list = list.filter(t => t.date <= ledgerTo);
-    return list.sort((a,b) => parseDate(b.date) - parseDate(a.date));
-  }, [txs, txFilter, ledgerSearch, ledgerFrom, ledgerTo]);
+  
+    return list.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+  }, [txs, importedTxs, txFilter, ledgerSearch, ledgerFrom, ledgerTo]);
 
   const ledgerSearchActive = !!(ledgerSearch.trim() || ledgerFrom || ledgerTo || txFilter !== "all");
   const ledgerSearchIncome   = useMemo(() => ledgerTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0), [ledgerTxs]);
@@ -2380,12 +1707,12 @@ export default function Vault() {
   const exportCSV = useCallback(() => {
     const header = ["Date","Type","Category","Description","Tags","Amount","Currency","Recurring"];
     const rows = txs.map(t => [t.date,t.type,t.category,`"${(t.description||"").replace(/"/g,'""')}"`,`"${(t.tags||"").replace(/"/g,'""')}"`,t.amount.toFixed(2),"USD",t.recurring?t.recurringFreq:"no"]);
-    triggerDownload(new Blob([[header,...rows].map(r=>r.join(",")).join("\n")],{type:"text/csv"}),`vault-${TODAY_STR}.csv`);
+    triggerDownload(new Blob([[header,...rows].map(r=>r.join(",")).join("\n")],{type:"text/csv"}),`vault-${getTodayStr()}.csv`);
     addToast(`Exported ${txs.length} records`, "ok");
   }, [txs, addToast]);
 
   const exportJSON = useCallback(() => {
-    triggerDownload(new Blob([JSON.stringify({baseLiquidity:precise(baseLiq),txs,budgets,customCats,currency:"USD"},null,2)],{type:"application/json"}),`vault-backup-${TODAY_STR}.json`);
+    triggerDownload(new Blob([JSON.stringify({baseLiquidity:precise(baseLiq),txs,budgets,customCats,currency:"USD"},null,2)],{type:"application/json"}),`vault-backup-${getTodayStr()}.json`);
     addToast(`Backup: ${txs.length} records`, "ok");
   }, [baseLiq, txs, budgets, customCats, addToast]);
 
@@ -2444,7 +1771,7 @@ export default function Vault() {
     const tx={...form,amount:precise(cents / 100),recurring:form.recurring||false,recurringFreq:form.recurringFreq||"monthly"};
     const next = editId ? txs.map(t=>t.id===editId?{...tx,id:t.id}:t) : [...txs,{...tx,id:Date.now().toString()+Math.random().toString(36).slice(2)}];
     setTxs(next); persist(next,baseLiq,budgets,customCats);
-    setModal(null); setEditId(null); setForm(blankForm(cats));
+    setNewTxView(false); setModal(null); setEditId(null); setForm(blankForm(cats));
     addToast(editId?"Transaction updated":"Transaction recorded","ok");
   }, [form,editId,txs,baseLiq,budgets,customCats,cats,persist,addToast]);
 
@@ -2461,20 +1788,30 @@ export default function Vault() {
     });
   }, [txs,baseLiq,budgets,customCats,persist,addToast]);
 
+  const deleteImportedTx = useCallback(async tx => {
+    if (!supabase) return;
+    await supabase
+      .from("imported_transactions")
+      .update({ user_overrides: { ...(tx.user_overrides || {}), hidden: true } })
+      .eq("id", tx.id);
+    addToast(`Deleted: ${tx.category||"transaction"}`, "info");
+  }, [addToast]);
+
   const handleDelete = useCallback(tx => {
+    if (tx.source === "plaid") { deleteImportedTx(tx); return; }
     const target=tx.isRecurringInstance?txs.find(t=>t.id===tx.recurringParentId)||tx:tx;
     if(target.recurring||tx.isRecurringInstance){setScopeAction({action:"delete",tx:target});return;}
     deleteTxById(tx.id);
-  }, [txs,deleteTxById]);
+  }, [txs,deleteTxById,deleteImportedTx]);
 
   const openEdit = useCallback(tx => {
     const target=tx.isRecurringInstance?txs.find(t=>t.id===tx.recurringParentId):tx;
     if(!target)return;
     if(tx.recurring||tx.isRecurringInstance){setScopeAction({action:"edit",tx:target});return;}
-    setEditId(target.id); setForm(formFromTx(target)); setModal("tx");
+    setEditId(target.id); setForm(formFromTx(target)); setNewTxView(true);
   }, [txs]);
 
-  const openAdd = useCallback(() => { setEditId(null); setForm(blankForm(cats)); setModal("tx"); }, [cats]);
+  const openAdd = useCallback((type = "expense") => { setEditId(null); setForm({ ...blankForm(cats), type }); setNewTxView(true); }, [cats]);
 
   const logout = useCallback(async () => {
     if (hasSupabaseConfig && supabase) {
@@ -2510,15 +1847,49 @@ export default function Vault() {
     addToast(`Removed: ${cat}`,"info");
   }, [customCats,txs,baseLiq,budgets,persist,addToast]);
 
+  useEffect(() => {
+    const h = e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(s => !s);
+        return;
+      }
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (["input","textarea","select"].includes(tag)) return;
+      // Escape closes any open modal/drawer
+      if (e.key === "Escape") { setModal(null); setScopeAction(null); setNewTxView(false); return; }
+      if (modal || scopeAction || newTxView) return;
+      const quickAdd = () => openAdd("expense");
+      const views = ["overview","ledger","insights","investments","settings"];
+      const map = {
+        n:quickAdd, N:quickAdd,
+        l:()=>setView("ledger"),   L:()=>setView("ledger"),
+        o:()=>setView("overview"), O:()=>setView("overview"),
+        c:()=>setView("calendar"), C:()=>setView("calendar"),
+        "?":()=>setModal("shortcuts"),
+      };
+      if (map[e.key]) { map[e.key](); return; }
+      if (e.key === "/") { e.preventDefault(); setShowCommandPalette(true); return; }
+      if (e.key === "[") { goPrev(); return; }
+      if (e.key === "]") { goNext(); return; }
+      if (e.key === "ArrowLeft")  goPrev();
+      if (e.key === "ArrowRight") goNext();
+      const idx = parseInt(e.key) - 1;
+      if (idx >= 0 && idx < views.length) setView(views[idx]);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [modal, scopeAction, newTxView, cats, openAdd]);
+
   const handleScopeThis = useCallback(() => {
     if(scopeAction.action==="delete"){deleteTxById(scopeAction.tx.id);}
-    else{setEditId(scopeAction.tx.id);setForm({...formFromTx(scopeAction.tx),recurring:false});setModal("tx");}
+    else{setEditId(scopeAction.tx.id);setForm({...formFromTx(scopeAction.tx),recurring:false});setNewTxView(true);}
     setScopeAction(null);
   }, [scopeAction,deleteTxById]);
 
   const handleScopeAll = useCallback(() => {
     if(scopeAction.action==="delete"){deleteTxById(scopeAction.tx.id);}
-    else{setEditId(scopeAction.tx.id);setForm(formFromTx(scopeAction.tx));setModal("tx");}
+    else{setEditId(scopeAction.tx.id);setForm(formFromTx(scopeAction.tx));setNewTxView(true);}
     setScopeAction(null);
   }, [scopeAction,deleteTxById]);
 
@@ -2529,7 +1900,7 @@ export default function Vault() {
 
   const LoadingScreen = () => (
     <div style={{ position:"fixed",inset:0,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:18 }}>
-      <div style={{ fontFamily:"'Inter',sans-serif",fontSize:11,letterSpacing:"0.35em",color:T.text3 }}>VAULT</div>
+      <div style={{ fontFamily:"'Inter',sans-serif",fontSize:11,letterSpacing:"0.35em",color:T.text3 }}>GRAPE</div>
       <div style={{ fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,letterSpacing:"0.3em",color:T.text4 }}>INITIALIZING SYSTEMS</div>
       <div style={{ width:120,height:1,background:T.border,position:"relative",overflow:"hidden",marginTop:4 }}>
         <div style={{ position:"absolute",top:0,height:"100%",width:"40%",background:T.blue,animation:"scan 1.4s ease-in-out infinite" }} />
@@ -2539,13 +1910,43 @@ export default function Vault() {
   );
 
   if (!authReady) return <LoadingScreen />;
-  if (hasSupabaseConfig && !session) return <AuthView onAuth={() => {}} />;
+  if (hasSupabaseConfig && !session) {
+    if (!showAuth) {
+      return (
+        <LandingPage
+          onSignIn={() => { setAuthIntent('signin'); setShowAuth(true); }}
+          onStartTrial={(income, expenses) => {
+            if (income) setCalcContext({ income, expenses });
+            setAuthIntent('signup');
+            setShowAuth(true);
+          }}
+          onSelectTier={(tid) => { setAuthIntent(tid); setShowAuth(true); }}
+        />
+      );
+    }
+    return (
+      <AuthView
+        onAuth={(newSession) => {
+          if (['solo', 'operator', 'studio'].includes(authIntent)) {
+            const email = encodeURIComponent(newSession?.user?.email || '');
+            window.location.href = `/api/checkout?tier=${authIntent}&email=${email}`;
+          }
+        }}
+        initialTab={authIntent === 'signin' ? 'signin' : 'signup'}
+        planHint={['solo','operator','studio'].includes(authIntent) ? authIntent : null}
+        calcContext={['solo','operator','studio'].includes(authIntent) ? null : calcContext}
+        onBack={() => { setShowAuth(false); setCalcContext(null); }}
+      />
+    );
+  }
   if (!loaded || !form) return <LoadingScreen />;
  
   // ── Onboarding gate — fires for brand new users only ──
   if (baseLiq === 0 && txs.length === 0) {
     return (
       <VaultOnboarding
+        theme={theme}
+        initialCapital={calcContext?.expenses || 0}
         onComplete={({ baseLiquidity, firstTx }) => {
           // 1. Set base capital
           const nb = baseLiquidity;
@@ -2566,15 +1967,49 @@ export default function Vault() {
       />
     );
   }
-    // ── Trial gate — fires when trial has expired and no paid tier ──
-    if (trialReady && trialExpired && !isPaid) {
-      return (
-        <TrialExpiredWall
-          accountEmail={accountEmail}
-        />
-      );
-    }
+    // ── Trial gate — disabled for free-first model (preserved for future activation) ──
+  // if (trialReady && trialExpired && !isPaid) {
+  //   return <TrialExpiredWall accountEmail={accountEmail} T={T} />;
+  // }
    
+
+  // ── Inline helper components (use T token, defined here for theme access) ──
+  function ProBadge() {
+    return (
+      <span style={{
+        fontSize: 9, fontWeight: 600, letterSpacing: '0.06em',
+        textTransform: 'uppercase', color: T.gold,
+        background: T.goldLight,
+        border: `1px solid rgba(184,137,26,0.20)`,
+        padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+      }}>Pro</span>
+    );
+  }
+
+  function StreakWidget() {
+    const todayHasTx = txs.some(t => t.date === getTodayStr() && !t.isRecurringInstance);
+    if (streakDays < 2 && todayHasTx) return null;
+    const last7 = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (6 - i));
+      return txs.some(t => t.date === d.toISOString().split("T")[0]);
+    });
+    return (
+      <div style={{ margin: '8px 12px 0', padding: '10px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 6 }}>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, fontWeight: 500, color: streakDays >= 3 ? '#D4A034' : 'rgba(255,255,255,0.70)', lineHeight: 1 }}>{streakDays}</span>
+          <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>day streak</span>
+        </div>
+        <div style={{ display: 'flex', gap: 3, marginBottom: 6 }}>
+          {last7.map((active, i) => (
+            <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: active ? '#10B981' : 'rgba(255,255,255,0.10)' }} />
+          ))}
+        </div>
+        <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, color: 'rgba(255,255,255,0.30)' }}>
+          {todayHasTx ? 'Grapes active today' : 'Log today to keep it going'}
+        </div>
+      </div>
+    );
+  }
 
   const breakEvenGap = monthExpenses - monthIncome;
   const overBudget   = budgetAlerts.some(a => a.over);
@@ -2585,132 +2020,196 @@ export default function Vault() {
     : ledgerIncome;
 
   const inputSx = {
-    width:"100%", background:"#FFFFFF",
-    border:`1.5px solid rgba(0,0,0,0.12)`, padding:"10px 13px",
-    color:T.text1, fontSize:13, fontFamily:"inherit",
-    transition:"border-color 150ms",
-    borderRadius:8,
+    width: "100%", background: T.bgCard,
+    border: `1.5px solid ${T.border}`, padding: "10px 13px",
+    color: T.text1, fontSize: 13, fontFamily: "inherit",
+    transition: "border-color 150ms",
+    borderRadius: T.radiusSm, outline: "none", boxSizing: "border-box",
   };
 
   const navItems = [
-    ["overview",  "Overview",  "O"],
-    ["calendar",  "Calendar",  "C"],
-    ["ledger",    "Ledger",    "L"],
-    ["forecast",  "Forecast",  null],
-    ["goals",     "Goals",     null],
-    ["settings",  "Settings",  ""],
-    ["mission",   "Mission",   "M"],
+    ["overview",     "Overview"],
+    ["calendar",     "Calendar"],
+    ["ledger",       "Ledger"],
+    ["investments",  "Investments"],
+    ["banks",        "Banks"],
   ];
 
   const anomalyDots = anomalies.filter(a => a.type === "spike").map(a => ({ ...a }));
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: VAULT_CSS }} />
-      <style dangerouslySetInnerHTML={{ __html: DARK_CSS }} />
-
       <div className="v-app">
 
         {/* ── SIDEBAR ── */}
-        <aside className="v-sidebar">
-          <div className="v-sidebar-logo">
-            <img src="/TheVaultShield.png" style={{ width:26, height:26, objectFit:'contain' }} alt="" />
-            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:15, fontWeight:800, letterSpacing:'-0.02em', color:T.text1, marginLeft:8 }}>
-              VAULT<span style={{ color:T.blue }}>IQ</span>
-            </span>
-          </div>
+        <aside className={`v-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
 
-          <div className="v-liq">
-            <div className="v-liq-label">Available Capital</div>
-            <div className="v-liq-value" style={{ color: liquidity >= 0 ? T.text1 : T.red }}>
-              {fmt(liquidity)}
-            </div>
-            <div style={{ marginTop:10, display:"flex", alignItems:"center", gap:8 }}>
-              {/* Mini 8-month sparkline */}
-              <svg width={70} height={24} style={{ display:"block", flexShrink:0 }}>
-                {(() => {
-                  const pts = MONTHS_SHORT.slice(0, 8).map((_, i) => {
-                    const mTxs = txsForMonth(txs, period.y, i);
-                    return mTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0) -
-                           mTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
-                  });
-                  const mn = Math.min(...pts), mx = Math.max(...pts);
-                  const rng = mx - mn || 1;
-                  const xs = pts.map((_, i) => (i / (pts.length - 1)) * 70);
-                  const ys = pts.map(v => 22 - ((v - mn) / rng) * 20);
-                  const d = xs.map((x, i) => `${i===0?"M":"L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
-                  const isPos = pts[pts.length-1] >= pts[0];
-                  return (
-                    <polyline points={xs.map((x,i)=>`${x},${ys[i]}`).join(" ")}
-                      fill="none" stroke={isPos ? T.green : T.red} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
-                  );
-                })()}
-              </svg>
-              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text4 }}>Base + net activity</div>
-            </div>
-          </div>
-          
-
-          {budgetAlerts.length > 0 && (
-            <div className="v-budget-alert">
-              <div className="v-label" style={{ fontSize:7.5, color:T.red, marginBottom:5 }}>Budget Alert</div>
-              {budgetAlerts.slice(0,3).map(({cat,over}) => (
-                <div key={cat} style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:over?T.red:T.gold, marginBottom:2, letterSpacing:"0.05em" }}>
-                  {over ? "▲" : "!"} {cat}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <nav className="v-nav">
-            {navItems.map(([id,lbl,key]) => (
-              <button key={id} className={`v-nav-item${view===id?" active":""}`} onClick={() => setView(id)}>
-                <span style={{ display:"flex", alignItems:"center", gap:9 }}>
-                  <span style={{ width:16, height:16, opacity:view===id?1:0.5, flexShrink:0 }}>{NavIcons[id]}</span>
-                  <span>{lbl}</span>
+          {/* Header: logo slot — doubles as expand trigger when collapsed */}
+          <div className="v-sidebar-header">
+            {sidebarCollapsed ? (
+              <button
+                className="v-logo-trigger"
+                onClick={() => { setSidebarCollapsed(false); localStorage.setItem('vault_sidebar_collapsed','false'); }}
+                title="Open sidebar"
+              >
+                <span className="v-logo-layer">
+                  <img
+                    src={isDark ? "/Grape_Logo_Light.png" : "/Grape_Logo_Dark.png"}
+                    className="v-sidebar-logo-img"
+                    style={{ opacity: isDark ? 0.95 : 0.80 }}
+                  />
                 </span>
-                {key && <span className="v-nav-key">{key}</span>}
+                <span className="v-expand-layer">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </span>
+              </button>
+            ) : (
+              <>
+                <img
+                  src={isDark ? "/Grape_Logo_Light.png" : "/Grape_Logo_Dark.png"}
+                  className="v-sidebar-logo-img"
+                  style={{ opacity: isDark ? 0.95 : 0.80 }}
+                />
+                <button
+                  className="v-sidebar-collapse"
+                  onClick={() => { setSidebarCollapsed(true); localStorage.setItem('vault_sidebar_collapsed','true'); }}
+                  title="Collapse"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <nav className="v-nav">
+            {navItems.map(([id, lbl]) => (
+              <button
+                key={id}
+                className={`v-nav-item${view === id ? ' active' : ''}`}
+                onClick={() => setView(id)}
+                title={sidebarCollapsed ? lbl : undefined}
+              >
+                <span className="v-nav-icon">{NavIcons[id]}</span>
+                {!sidebarCollapsed && <span className="v-nav-label">{lbl}</span>}
               </button>
             ))}
           </nav>
 
+          {/* Bottom: financial summary + New + account */}
           <div className="v-sidebar-bottom">
-            <div className="v-sidebar-actions">
-              <button onClick={openAdd} className="v-btn-primary">
-                + Record Transaction
-              </button>
-              <button onClick={logout} className="v-btn-secondary" style={{ width:"100%", marginTop:8, textAlign:"center" }}>
-                Logout
-              </button>
-              <TrialBanner daysRemaining={daysRemaining} isPaid={isPaid} />
-              {hasSupabaseConfig && accountEmail && (
-                <div style={{ width:"100%", marginTop:10, padding:"10px 12px", border:"1px solid rgba(0,0,0,0.08)", background:"#F7F9FC", boxSizing:"border-box", borderRadius:8 }}>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, marginBottom:6 }}>
-                    <span style={{ width:5, height:5, borderRadius:"999px", background:"#00B876", display:"inline-block" }} />
-                    <div className="v-label" style={{ fontSize:6.5, marginBottom:0, color:"#00B876" }}>Authenticated</div>
-                  </div>
-                  <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:9.5, color:"#3D4452", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", textAlign:"center" }}>{accountEmail}</div>
-                  <div style={{ marginTop:5, fontFamily:"'JetBrains Mono', monospace", fontSize:6.5, color:"#9CA3AF", textAlign:"center", letterSpacing:"0.08em", textTransform:"uppercase" }}>Secure Session Active</div>
+            {!sidebarCollapsed && (
+              <div className="v-sidebar-summary">
+                <div className="v-sidebar-summary-line" style={{ display:"flex", alignItems:"baseline", gap:4 }}>
+                  <AnimatedValue value={liquidity} fmt={fmt} fontSize={12} color={T.text2} style={{ letterSpacing:"-0.02em", lineHeight:1, fontWeight:400 }} />
+                  {runwayDaysNum !== null && <span style={{ color:T.text4, fontSize:10 }}> · {runwayDaysNum}d</span>}
                 </div>
-              )}
-              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:7, color:"#9CA3AF", textAlign:"center", letterSpacing:"0.15em", marginTop:10, marginBottom:2 }}>
-                N · new &nbsp;&nbsp; ← → · month &nbsp;&nbsp; M · mission
               </div>
-            </div>
+            )}
+
+            {!sidebarCollapsed && (
+              <div style={{ height: 1, background: T.border, margin: '0 10px 4px' }} />
+            )}
+
+            <button
+              className="v-nav-item v-new-btn"
+              onClick={() => { setEditId(null); setForm({ ...blankForm(cats) }); setNewTxView(true); }}
+              title={sidebarCollapsed ? "+ New" : undefined}
+            >
+              <span className="v-nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </span>
+              {!sidebarCollapsed && <span className="v-nav-label">New</span>}
+            </button>
+
+            {/* Profile / account button */}
+            <button
+              ref={avatarBtnRef}
+              className="v-nav-item"
+              onClick={() => {
+                if (!showAccountMenu) {
+                  const rect = avatarBtnRef.current.getBoundingClientRect();
+                  setMenuCoords({
+                    bottom: window.innerHeight - rect.top + 6,
+                    left: sidebarCollapsed ? rect.right + 8 : rect.left,
+                  });
+                }
+                setShowAccountMenu(s => !s);
+              }}
+              title={sidebarCollapsed ? (accountEmail || 'Account') : undefined}
+              style={{ opacity: showAccountMenu ? 1 : undefined }}
+            >
+              <span className="v-nav-icon">
+                <div className="v-avatar">{(accountEmail?.[0] || 'A').toUpperCase()}</div>
+              </span>
+              {!sidebarCollapsed && (
+                <span className="v-nav-label" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {accountEmail ? accountEmail.split('@')[0] : 'Account'}
+                </span>
+              )}
+            </button>
           </div>
+
         </aside>
+
+        {/* ── ACCOUNT POPOVER (portal) ── */}
+        {showAccountMenu && createPortal(
+          <div
+            ref={popoverPortalRef}
+            className="v-account-popover"
+            style={{ position: 'fixed', bottom: menuCoords.bottom, left: menuCoords.left }}
+          >
+            {/* Identity header */}
+            <div className="v-account-popover-header">
+              <div className="v-account-popover-email">{accountEmail || 'Guest'}</div>
+            </div>
+            <div className="v-account-popover-divider" />
+
+            {/* Theme toggle */}
+            <button className="v-account-popover-item" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+              <span style={{ width: 15, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                {theme === 'dark'
+                  ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                  : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                }
+              </span>
+              {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            </button>
+
+            <div className="v-account-popover-divider" />
+
+            {/* Settings */}
+            <button className="v-account-popover-item" onClick={() => { setView('settings'); setShowAccountMenu(false); }}>
+              <span style={{ width: 15, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+              </span>
+              Settings
+            </button>
+
+            <div className="v-account-popover-divider" />
+
+            {/* Sign out */}
+            <button className="v-account-popover-item v-account-popover-signout" onClick={() => { setShowAccountMenu(false); logout(); }}>
+              <span style={{ width: 15, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              </span>
+              Sign out
+            </button>
+          </div>,
+          document.body
+        )}
 
         {/* ── MOBILE TOPBAR ── */}
         <div className="v-mobile-topbar">
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <img src="/TheVaultShield.png" className="v-mobile-logo-img" alt="" />
-            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:800, letterSpacing:"-0.02em", color:"#0A0C10" }}>VAULT<span style={{ color:"#1A6FD4" }}>IQ</span></span>
+            <img src={isDark ? "/Grape_Logo_Light.png" : "/Grape_Logo_Dark.png"} className="v-mobile-logo-img" alt="" />
+            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:600, letterSpacing:"-0.02em", color:T.text1 }}>Grape</span>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, fontWeight:400, color:liquidity>=0?T.text1:T.red, letterSpacing:"-0.03em" }}>
-              {fmt(liquidity)}
-            </div>
-            {(view==="overview"||view==="calendar") && (
+            <AnimatedValue value={liquidity} fmt={fmt} fontSize={12} color={liquidity>=0?T.text1:T.red} style={{ letterSpacing:"-0.03em", lineHeight:1, fontWeight:400 }} />
+            {view==="calendar" && (
               <div style={{ display:"flex", alignItems:"center", gap:5 }}>
                 <button className="v-period-btn" onClick={goPrev} style={{ minWidth:36, minHeight:36 }}>‹</button>
                 <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9.5, color:T.text2 }}>{MONTHS_SHORT[period.m]} {period.y}</span>
@@ -2722,101 +2221,11 @@ export default function Vault() {
 
         {/* ── MAIN ── */}
         <div className="v-main">
-          <header className="v-header">
-            <div>
-              <div className="v-header-breadcrumb">{{ overview:"VAULT / OVERVIEW", calendar:"VAULT / CALENDAR", ledger:"VAULT / LEDGER", settings:"VAULT / SETTINGS", mission:"VAULT / MISSION", forecast:"VAULT / FORECAST", goals:"VAULT / GOALS" }[view] ?? `VAULT / ${view.toUpperCase()}`}</div>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <div className="v-header-title">
-                  {{ overview:"Command Overview", calendar:"Transaction Calendar", ledger:"Transaction Ledger", settings:"System Configuration", mission:"Launch Mission", forecast:"Cash Flow Forecast", goals:"Financial Goals" }[view]}
-                </div>
-                {view === "overview" && momIncomePct !== null && (
-                  <TrendPill pct={momIncomePct} />
-                )}
-              </div>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-              {(view==="overview"||view==="calendar") && (
-                <div className="v-period-nav">
-                  <button className="v-period-btn" onClick={goPrev}>‹</button>
-                  <span className="v-period-label">{MONTHS_FULL[period.m].toUpperCase()} {period.y}</span>
-                  <button className="v-period-btn" onClick={goNext}>›</button>
-                </div>
-              )}
-              {/* Theme toggle */}
-              <button
-                onClick={() => setTheme(t => {
-                  const next = t === 'dark' ? 'light' : 'dark';
-                  localStorage.setItem('vault_theme', next);
-                  return next;
-                })}
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                style={{ background:'none', border:`1px solid ${T.border}`, borderRadius:T.radiusSm,
-                  cursor:'pointer', padding:'7px 9px', display:'flex', alignItems:'center',
-                  color:T.text3, transition:'all 200ms ease', flexShrink:0 }}
-              >
-                {theme === 'dark' ? (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="5"/>
-                    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                  </svg>
-                ) : (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                  </svg>
-                )}
-              </button>
-
-              <div style={{ position:'relative' }}>
-                <button onClick={() => { setShowNotifications(s=>!s); setNotifRead(true); }}
-                  style={{ background:'transparent', border:`1px solid ${T.border}`, borderRadius:8,
-                    padding:'8px 12px', cursor:'pointer', fontSize:16, color:T.text3,
-                    display:'flex', alignItems:'center', gap:6, position:'relative' }}>
-                  🔔
-                  {!notifRead && budgetAlerts.length > 0 && (
-                    <span style={{ position:'absolute', top:4, right:4, width:8, height:8,
-                      borderRadius:'50%', background:'#E53935', border:'2px solid white' }} />
-                  )}
-                </button>
-                {showNotifications && (
-                  <div style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:320,
-                    background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12,
-                    boxShadow:T.shadowLg, zIndex:200, overflow:'hidden' }}>
-                    <div style={{ padding:'14px 16px', borderBottom:`1px solid ${T.border}`,
-                      fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:700,
-                      letterSpacing:'0.06em', textTransform:'uppercase', color:T.text4 }}>Alerts</div>
-                    <div style={{ maxHeight:280, overflowY:'auto' }}>
-                      {budgetAlerts.length === 0 && (
-                        <div style={{ padding:'20px 16px', fontFamily:"'Inter',sans-serif", fontSize:13, color:T.text4, textAlign:'center' }}>No active alerts</div>
-                      )}
-                      {budgetAlerts.map((a, i) => (
-                        <div key={i} style={{ padding:'12px 16px', borderBottom:`1px solid ${T.border}`,
-                          display:'flex', gap:10, alignItems:'flex-start' }}>
-                          <span style={{ fontSize:14, flexShrink:0, marginTop:1 }}>{a.over ? '🔴' : '🟡'}</span>
-                          <div style={{ fontFamily:"'Inter',sans-serif" }}>
-                            <div style={{ fontSize:13, fontWeight:600, color:T.text1 }}>{a.cat}</div>
-                            <div style={{ fontSize:11, color:T.text4, marginTop:2 }}>
-                              ${a.spent.toLocaleString('en-US',{maximumFractionDigits:0})} of ${a.limit.toLocaleString('en-US',{maximumFractionDigits:0})} budget
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <button onClick={openAdd} className="v-btn-primary" style={{ width:"auto", padding:"9px 20px", fontSize:13, letterSpacing:0, fontWeight:600 }}>
-                + New
-              </button>
-            </div>
-          </header>
 
           <main className="v-content">
             <div
               className={
-                view === "calendar" || view === "overview" || view === "ledger" || view === "settings" || view === "mission" || view === "forecast" || view === "goals"
+                view === "calendar" || view === "overview" || view === "ledger" || view === "settings" || view === "investments"
                   ? "v-content-inner v-content-inner--wide"
                   : "v-content-inner"
               }
@@ -2824,421 +2233,215 @@ export default function Vault() {
 
             {/* ─── OVERVIEW ─── */}
             {view === "overview" && (
-              <div style={{ padding:"20px 24px 60px" }}>
+              <div style={{ paddingBottom: 60 }}>
 
-                {/* ── Intelligence bar ── */}
+                {/* ── VAULT STATUS BAR ── */}
                 <div style={{
-                  display:"flex", alignItems:"center", gap:14, flexWrap:"wrap",
-                  marginBottom:16, padding:"10px 18px",
-                  background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12,
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "10px 32px",
+                  borderBottom: `1px solid ${T.border}`,
                 }}>
-                  {intelMsgs.map((msg, i) => (
-                    <div key={i} style={{ display:"flex", alignItems:"center", gap:7 }}>
-                      <div style={{
-                        width:6, height:6, borderRadius:"50%", background:msg.color, flexShrink:0,
-                        boxShadow: msg.severity==="critical" ? `0 0 8px ${msg.color}` : "none",
-                        animation: msg.severity==="critical" ? "pulse-dot 1.8s ease-in-out infinite" : "none",
-                      }} />
-                      <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:msg.severity==="ok"?T.text2:msg.color, fontWeight:500 }}>{msg.text}</span>
-                    </div>
-                  ))}
-                  <div style={{ flex:1 }} />
-                  <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text4, letterSpacing:"0.08em" }}>
-                    {new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"}).toUpperCase()}
+                  <div style={{
+                    width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
+                    background: runwayDaysNum === null ? T.text4 : runwayDaysNum >= 90 ? T.green : runwayDaysNum >= 30 ? T.gold : T.red,
+                  }} />
+                  <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, fontWeight: 400, color: T.text3, letterSpacing: "-0.01em" }}>
+                    {runwayDaysNum === null
+                      ? "Set a monthly expense to unlock your runway clock"
+                      : runwayDaysNum >= 365
+                        ? `Runway secured · ${runwayDaysNum} days · Capital efficiency is strong`
+                        : runwayDaysNum >= 180
+                          ? `${runwayDaysNum} days of runway · room to grow`
+                          : runwayDaysNum >= 90
+                            ? `${runwayDaysNum} days of runway · consider reducing burn`
+                            : runwayDaysNum >= 30
+                              ? `${runwayDaysNum} days — your most important number right now`
+                              : `${runwayDaysNum} days — critical, act now`}
                   </span>
                 </div>
 
-                {/* ── 5 Premium KPI Cards ── */}
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10, marginBottom:12 }}>
-                  {/* Net Position */}
-                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${monthNet>=0?T.green:T.red}`, animationDelay:'0ms' }}>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Net Position</div>
-                    <div className="v-kpi-number" style={{ color: monthNet>=0?T.green:T.red, marginBottom:4 }}>
-                      {monthNet>=0?"+":"-"}{fmt(Math.abs(monthNet))}
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
-                      <span style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3 }}>
-                        {monthNet>=0 ? "Positive cycle" : "Deficit cycle"}
-                      </span>
-                    </div>
-                    <Sparkline data={sparklineData.net} color={monthNet>=0?T.green:T.red} width={80} height={32} />
+                {/* ── HERO BALANCE ── */}
+                <div style={{
+                  background: T.bgCard,
+                  borderBottom: `1px solid ${T.border}`,
+                  padding: "40px 32px 0",
+                }}>
+                  <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: T.text4, marginBottom: 12 }}>
+                    Capital Position
                   </div>
-
-                  {/* Daily Burn */}
-                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${T.red}`, animationDelay:'60ms' }}>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Daily Burn</div>
-                    <div className="v-kpi-number" style={{ color:T.red, marginBottom:4 }}>
-                      {dailyBurn > 0 ? `${fmt(dailyBurn)}/day` : "—"}
-                    </div>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3, marginBottom:6 }}>
-                      {dailyBurn > 0 ? `${fmt(dailyBurn * 30.4375)}/mo pace` : "No expenses yet"}
-                    </div>
-                    <Sparkline data={sparklineData.expenses} color={T.red} width={80} height={32} />
-                  </div>
-
-                  {/* Savings Rate */}
-                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${T.blue}`, animationDelay:'120ms' }}>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Savings Rate</div>
-                    <div className="v-kpi-number" style={{ color: savingsRate===null?T.text3:savingsRate>=20?T.green:savingsRate>=0?T.gold:T.red, marginBottom:4 }}>
-                      {savingsRate !== null ? `${savingsRate.toFixed(1)}%` : "—"}
-                    </div>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3, marginBottom:6 }}>
-                      {savingsRate !== null ? (savingsRate>=20?"Strong discipline":savingsRate>=0?"Room to improve":"Spending > earning") : "Add income to track"}
-                    </div>
-                    <Sparkline data={sparklineData.savings} color={T.blue} width={80} height={32} />
-                  </div>
-
-                  {/* Runway */}
-                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${T.gold}`, animationDelay:'180ms' }}>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Runway</div>
-                    <div className="v-kpi-number" style={{ color: runwayDisplay?T.gold:T.text3, marginBottom:4 }}>
-                      {runwayDisplay?.primary ?? "—"}
-                    </div>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3, marginBottom:6 }}>
-                      {runwayDisplay?.secondary ?? "Insufficient data"}
-                    </div>
-                    {runwayDaysNum !== null && (
-                      <div style={{ height:4, background:"rgba(0,0,0,0.06)", borderRadius:2, overflow:"hidden" }}>
-                        <div style={{ height:"100%", width:`${Math.min(100, (runwayDaysNum/365)*100)}%`, background:runwayDaysNum>=180?T.green:runwayDaysNum>=90?T.gold:T.red, borderRadius:2, transition:"width 0.8s ease" }} />
+                  <AnimatedCapital value={liquidity} fmt={fmt} style={{ marginBottom: 36 }} />
+                  {/* Three supporting metrics — borderless row */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", borderTop: `1px solid ${T.border}` }}>
+                    {/* Runway — text-only, not a dollar value */}
+                    <div style={{ padding: "20px 24px", borderRight: `1px solid ${T.border}` }}>
+                      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: T.text4, marginBottom: 10 }}>Runway</div>
+                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, fontWeight: 400, letterSpacing: "-0.04em", lineHeight: 1, color: runwayDaysNum === null ? T.text3 : runwayDaysNum >= 180 ? T.green : runwayDaysNum >= 60 ? T.gold : T.red, marginBottom: 5 }}>
+                        {runwayDaysNum === null ? "—" : runwayDaysNum >= 365 ? `${(runwayDaysNum/365).toFixed(1)}yr` : `${runwayDaysNum}d`}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Health Score */}
-                  <div className="v-kpi-premium" style={{ borderTop:`3px solid ${healthScore>=70?T.green:healthScore>=45?T.gold:T.red}`, animationDelay:'240ms' }}>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:8 }}>Health Score</div>
-                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
-                      <div style={{ position:"relative", width:44, height:44, flexShrink:0 }}>
-                        <svg width={44} height={44} style={{ transform:"rotate(-90deg)", display:"block" }}>
-                          <circle cx={22} cy={22} r={18} fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={4} />
-                          <circle cx={22} cy={22} r={18} fill="none" stroke={healthScore>=70?T.green:healthScore>=45?T.gold:T.red} strokeWidth={4}
-                            strokeDasharray={`${(healthScore/100)*2*Math.PI*18} ${2*Math.PI*18}`} strokeLinecap="round" style={{ transition:"stroke-dasharray 1.2s cubic-bezier(0.16,1,0.3,1)" }} />
-                        </svg>
-                        <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, fontWeight:600, color:healthScore>=70?T.green:healthScore>=45?T.gold:T.red }}>{healthScore}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:13, fontWeight:700, color:healthScore>=70?T.green:healthScore>=45?T.gold:T.red }}>
-                          {healthScore>=70?"Strong":healthScore>=45?"Stable":"At Risk"}
-                        </div>
-                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text3 }}>{healthScore}/100</div>
-                      </div>
+                      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: T.text4 }}>{dailyBurn > 0 ? `${fmt(dailyBurn)}/day burn rate` : "add expenses to calculate"}</div>
+                    </div>
+                    {/* Daily Burn — animated */}
+                    <div style={{ padding: "20px 24px", borderRight: `1px solid ${T.border}` }}>
+                      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: T.text4, marginBottom: 10 }}>Daily Burn</div>
+                      {dailyBurn > 0
+                        ? <AnimatedValue value={dailyBurn} fmt={fmt} fontSize={20} color={T.text1} style={{ marginBottom: 5 }} />
+                        : <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, color: T.text3, marginBottom: 5 }}>—</div>}
+                      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: T.text4 }}>{dailyBurn > 0 ? `${fmt(dailyBurn * 30.44)} per month` : "no expenses yet"}</div>
+                    </div>
+                    {/* Month Net — animated, signed */}
+                    <div style={{ padding: "20px 24px" }}>
+                      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: T.text4, marginBottom: 10 }}>{MONTHS_SHORT[period.m]} Net</div>
+                      {monthIncome === 0 && monthExpenses === 0
+                        ? <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, color: T.text3, marginBottom: 5 }}>—</div>
+                        : <AnimatedValue value={monthNet} fmt={fmt} signed fontSize={20} color={monthNet > 0 ? T.green : monthNet < 0 ? T.red : T.text3} style={{ marginBottom: 5 }} />}
+                      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 11, color: T.text4 }}>{monthNet > 0 ? "positive cash flow" : monthNet < 0 ? "deficit this month" : "no transactions yet"}</div>
                     </div>
                   </div>
                 </div>
 
-                {/* ── Financial Report Card ── */}
-                <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:12 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
-                    {/* GPA */}
-                    <div style={{ textAlign:"center", padding:"0 16px 0 0", borderRight:"1px solid rgba(0,0,0,0.08)" }}>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:4 }}>Overall</div>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:28, fontWeight:800, letterSpacing:"-0.03em",
-                        color: reportCard.overallGrade==='A'||reportCard.overallGrade==='A+'?T.green : reportCard.overallGrade==='B'?T.blue : reportCard.overallGrade==='C'?T.gold : T.red }}>
-                        {reportCard.overallGrade}
+                {/* ── TREND DIRECTION ── */}
+                <div style={{
+                  padding: "24px 32px",
+                  borderBottom: `1px solid ${T.border}`,
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20,
+                }}>
+                  <div>
+                    <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, fontWeight: 400, letterSpacing: "-0.02em", marginBottom: 5, color: chartMomentum === "up" ? T.green : chartMomentum === "down" ? T.red : T.text2 }}>
+                      {chartMomentum === "up" ? "↑ Improving" : chartMomentum === "down" ? "↓ Watch your burn rate" : "→ Holding steady"}
+                    </div>
+                    <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: T.text3, lineHeight: 1.6, letterSpacing: "-0.01em" }}>
+                      {momIncomePct !== null && momExpensePct !== null
+                        ? `Income ${momIncomePct >= 0 ? "up" : "down"} ${Math.abs(momIncomePct).toFixed(0)}% · Expenses ${momExpensePct >= 0 ? "up" : "down"} ${Math.abs(momExpensePct).toFixed(0)}% vs last month`
+                        : monthNet !== 0
+                          ? `${monthNet >= 0 ? "Net surplus" : "Net deficit"} of ${fmt(Math.abs(monthNet))} this month`
+                          : "Log transactions to see your trend analysis"}
+                    </div>
+                  </div>
+                  {monthlyChartData.filter(d => d.Income > 0 || d.Expenses > 0).length > 1 && (
+                    <div style={{ flexShrink: 0 }}>
+                      <ResponsiveContainer width={160} height={44}>
+                        <AreaChart data={monthlyChartData.slice(-6).map(d => ({ ...d, Net: d.Income - d.Expenses }))} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                          <defs>
+                            <linearGradient id="gOvNet" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%"  stopColor={chartMomentum === "down" ? T.red : T.text1} stopOpacity={0.08} />
+                              <stop offset="95%" stopColor={chartMomentum === "down" ? T.red : T.text1} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <Area type="monotone" dataKey="Net" stroke={chartMomentum === "down" ? T.red : T.text2} strokeWidth={1.2} fill="url(#gOvNet)" dot={false} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── TOP PRIORITY SIGNAL ── */}
+                {priorityActions.length > 0 && (() => {
+                  const top = priorityActions[0];
+                  const color = top.type === "alert" ? T.red : top.type === "warn" ? T.gold : top.type === "good" ? T.green : T.text2;
+                  return (
+                    <div style={{ padding: "20px 32px", borderBottom: `1px solid ${T.border}` }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                        <div style={{ width: 3, height: "100%", background: color, borderRadius: 2, alignSelf: "stretch", flexShrink: 0, minHeight: 40 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: 500, color: T.text1, letterSpacing: "-0.01em", display: "flex", alignItems: "center", gap: 6 }}>
+                            {top.icon && <span aria-hidden="true">{top.icon}</span>}
+                            <span className="sr-only">{top.type === "warn" || top.type === "alert" ? "Warning: " : top.type === "good" ? "Good news: " : "Info: "}</span>
+                            {top.text}
+                          </div>
+                          {top.type === "alert" && (
+                            <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
+                              <button
+                                className="v-btn-ghost"
+                                style={{ fontSize: 12, color: T.green, padding: 0 }}
+                                onClick={() => { setForm({ ...blankForm(cats), type: 'income' }); setEditId(null); setNewTxView(true); }}
+                              >
+                                + Add income
+                              </button>
+                              <button
+                                className="v-btn-ghost"
+                                style={{ fontSize: 12, padding: 0 }}
+                                onClick={() => setView('ledger')}
+                              >
+                                Review spending →
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {/* 5 grades */}
-                    <div style={{ display:"flex", gap:8, flex:1, flexWrap:"wrap" }}>
-                      {[
-                        { key:"incomeGrowth", label:"Income Growth" },
-                        { key:"spendControl", label:"Spend Control" },
-                        { key:"savingsRate",  label:"Savings Rate" },
-                        { key:"runway",       label:"Runway" },
-                        { key:"budgetAdherence", label:"Budget" },
-                      ].map(({ key, label }) => {
-                        const g = reportCard[key];
-                        const isOpen = expandedGrade === key;
+                  );
+                })()}
+
+                {/* ── DAILY ACTIVITY TIMELINE ── */}
+                {(() => {
+                  const days = [];
+                  for (let i = 13; i >= 0; i--) {
+                    const d = new Date(); d.setDate(d.getDate() - i);
+                    const dateStr = d.toISOString().split("T")[0];
+                    const importedDay = importedTxs.filter(t => !t.hidden && !t.transfer && t.date === dateStr);
+                    const dayTxs = [...txs.filter(t => t.date === dateStr && !t.isRecurringInstance), ...importedDay];
+                    const income  = dayTxs.filter(t => t.type === "income").reduce((s,t) => s + t.amount, 0);
+                    const expense = dayTxs.filter(t => t.type === "expense").reduce((s,t) => s + t.amount, 0);
+                    days.push({ dateStr, d, income, expense, net: income - expense, txCount: dayTxs.length, dayTxs });
+                  }
+                  const maxAbs = Math.max(...days.map(d => Math.abs(d.net)), 1);
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  return (
+                    <div>
+                      <div style={{ padding: "20px 32px 8px", fontFamily: "'Inter',sans-serif", fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: T.text4 }}>
+                        Last 14 Days
+                      </div>
+                      {days.map(({ dateStr, d, net, txCount, dayTxs }) => {
+                        const isExpanded = expandedTimelineDay === dateStr;
+                        const isEmpty    = txCount === 0;
+                        const isToday    = dateStr === todayStr;
+                        const dayLabel   = `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]} ${String(d.getDate()).padStart(2,"0")}`;
+                        const barPct     = isEmpty ? 0 : Math.max(2, (Math.abs(net) / maxAbs) * 100);
                         return (
-                          <div key={key} style={{ position:"relative" }}>
-                            <div className="v-grade-badge" onClick={() => setExpandedGrade(isOpen ? null : key)}
-                              style={{ borderColor: g.border, background: g.bg }}>
-                              <span style={{ fontFamily:"'Inter',sans-serif", fontSize:16, fontWeight:800, color:g.color }}>{g.grade}</span>
-                              <span style={{ fontFamily:"'Inter',sans-serif", fontSize:8, fontWeight:600, color:g.color, textAlign:"center", lineHeight:1.2, marginTop:1 }}>{label}</span>
+                          <div key={dateStr}>
+                            <div
+                              onClick={() => !isEmpty && setExpandedTimelineDay(isExpanded ? null : dateStr)}
+                              style={{ display: "flex", alignItems: "center", gap: 16, padding: "10px 32px", cursor: isEmpty ? "default" : "pointer", transition: "background 150ms ease" }}
+                              onMouseEnter={e => { if (!isEmpty) e.currentTarget.style.background = T.bgSubtle; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                            >
+                              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: isToday ? 500 : 400, color: isToday ? T.text1 : T.text4, width: 54, flexShrink: 0, letterSpacing: "0.02em" }}>
+                                {dayLabel}
+                              </div>
+                              <div style={{ flex: 1, height: 1, background: T.border, borderRadius: 1 }}>
+                                {!isEmpty && <div style={{ height: "100%", width: `${barPct}%`, background: net >= 0 ? T.green : T.red, borderRadius: 1, opacity: 0.50 }} />}
+                              </div>
+                              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 400, letterSpacing: "-0.03em", color: isEmpty ? T.text4 : net >= 0 ? T.green : T.red, width: 88, textAlign: "right", flexShrink: 0 }}>
+                                {isEmpty ? "—" : `${net >= 0 ? "+" : "−"}${fmt(Math.abs(net))}`}
+                              </div>
+                              {!isEmpty && <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 10, color: T.text4, width: 16, textAlign: "right", flexShrink: 0 }}>{txCount}</div>}
                             </div>
-                            {isOpen && (
-                              <div style={{ position:"absolute", top:"calc(100% + 8px)", left:"50%", transform:"translateX(-50%)", zIndex:20,
-                                background:T.bgCard, border:`1px solid ${T.borderMid}`, borderRadius:10, padding:"12px 14px",
-                                boxShadow:T.shadowLg, minWidth:200, maxWidth:260 }}>
-                                <div style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, color:T.text1, marginBottom:4 }}>{label}: {g.grade}</div>
-                                <div style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:T.text2, lineHeight:1.5 }}>{g.tip}</div>
+                            {isExpanded && dayTxs.length > 0 && (
+                              <div style={{ padding: "6px 32px 10px 108px", borderBottom: `1px solid ${T.border}` }}>
+                                {dayTxs.map(tx => (
+                                  <div key={tx.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${T.border}` }}>
+                                    <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 12, color: T.text2, letterSpacing: "-0.01em" }}>{tx.description || tx.category}</span>
+                                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 400, color: tx.type === "income" ? T.green : T.red }}>
+                                      {tx.type === "income" ? "+" : "−"}{fmt(tx.amount)}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
                         );
                       })}
                     </div>
-                    {/* Break-even status */}
-                    <div style={{ textAlign:"right" }}>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase", color:T.text4, marginBottom:3 }}>This Month</div>
-                      <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, fontWeight:600, color:breakEvenGap>0?T.gold:T.green }}>
-                        {breakEvenGap>0 ? `${fmt(breakEvenGap)} to break-even` : "Break-even achieved ✓"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Priority Actions ── */}
-                <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 20px", marginBottom:12 }}>
-                  <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:12 }}>
-                    This Month's Priorities
-                  </div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {priorityActions.map((a, i) => (
-                      <div key={i} className="v-priority-item">
-                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:16, flexShrink:0, lineHeight:1 }}>{a.icon}</div>
-                        <div style={{ flex:1 }}>
-                          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:500, color:T.text1 }}>{a.text}</span>
-                        </div>
-                        {a.impact && (
-                          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, fontWeight:600, color:T.green, flexShrink:0, background:T.greenLight, padding:"2px 8px", borderRadius:6 }}>
-                            save {a.impact}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* ── Milestone badges ── */}
-                {earnedBadges.length > 0 && (
-                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:12 }}>
-                    {earnedBadges.map(b => (
-                      <div key={b.id} className="v-milestone-badge" style={{ background:b.bg, borderColor:b.border, color:b.color }}>
-                        <span>{b.icon}</span>
-                        <span>{b.label}</span>
-                        <button onClick={() => {
-                          const next = new Set(dismissedBadges); next.add(b.id);
-                          setDismissedBadges(next);
-                          try { localStorage.setItem('vault:badges', JSON.stringify([...next])); } catch {}
-                        }} style={{ background:"none", border:"none", cursor:"pointer", color:b.color, fontSize:12, padding:0, lineHeight:1, opacity:0.6, marginLeft:2 }}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* ── Forecast row ── */}
-                {showProjected && (
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:12 }}>
-                    {[
-                      { label:`Projected Income · ${MONTHS_SHORT[(period.m+1)%12]}`, value:fmt(projectedNext.income), color:T.green },
-                      { label:`Projected Burn · ${MONTHS_SHORT[(period.m+1)%12]}`,   value:fmt(projectedNext.expense), color:T.red },
-                      { label:`Projected Net · ${MONTHS_SHORT[(period.m+1)%12]}`,    value:fSign(projectedNext.income-projectedNext.expense), color:projectedNext.income-projectedNext.expense>=0?T.green:T.red },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"18px 22px" }}>
-                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:12 }}>{label}</div>
-                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:22, fontWeight:500, color, letterSpacing:"-0.04em" }}>{value}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-
-                {/* ── Chart Panel ── */}
-                <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:16, marginBottom:12 }}>
-                  <div style={{ padding:"20px 24px 0", display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
-                    <div>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:5 }}>
-                        {chartMode==="monthly" ? `Performance Intelligence · ${period.y}` : "Multi-Year Analysis"}
-                      </div>
-                      {anomalies.length > 0 && (
-                        <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:6 }}>
-                          {anomalies.map((a, i) => (
-                            <span key={i} className="v-anomaly-badge">
-                              {a.type==="spike" ? `↑ ${a.name} spike` : `! ${a.name} no income`}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
-                      {[{c:T.green,l:"Income"},{c:T.red,l:"Burn"}].map(x=>(
-                        <div key={x.l} style={{ display:"flex", alignItems:"center", gap:7, fontFamily:"'JetBrains Mono',monospace", fontSize:9.5, color:T.text2 }}>
-                          <div style={{ width:16, height:2, background:x.c, opacity:0.7, borderRadius:1 }} />{x.l}
-                        </div>
-                      ))}
-                      <div style={{ width:1, height:14, background:"rgba(0,0,0,0.1)" }} />
-                      {[["monthly","Monthly"],["yearly","Yearly"]].map(([id,lbl])=>(
-                        <button key={id} onClick={()=>setChartMode(id)} style={{
-                          padding:"5px 12px",
-                          background:chartMode===id?T.blueLight:"transparent",
-                          border:`1px solid ${chartMode===id?"rgba(26,111,212,0.3)":"transparent"}`,
-                          color:chartMode===id?T.blue:T.text3,
-                          fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:500,
-                          letterSpacing:"0", borderRadius:6, transition:"all 150ms",
-                        }}>
-                          {lbl}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ padding:"8px 0 8px" }}>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <AreaChart data={chartData} margin={{ top:10, right:24, bottom:0, left:6 }}>
-                        <defs>
-                          <linearGradient id="gInc" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%"  stopColor={T.green} stopOpacity={0.10}/>
-                            <stop offset="95%" stopColor={T.green} stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="gExp" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%"  stopColor={T.red} stopOpacity={0.07}/>
-                            <stop offset="95%" stopColor={T.red} stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="2 8" stroke="rgba(0,0,0,0.05)" vertical={false} />
-                        <XAxis dataKey="name" tick={{ fill:T.text4, fontSize:9, fontFamily:"'JetBrains Mono',monospace" }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill:T.text4, fontSize:9, fontFamily:"'JetBrains Mono',monospace" }} axisLine={false} tickLine={false}
-                          tickFormatter={v=>v>=1000?`$${(v/1000).toFixed(0)}k`:`$${v}`} width={44} />
-                        <Tooltip content={props => <ChartTip {...props} fmt={fmt} fSign={fSign} anomalies={anomalies} />} />
-                        <ReferenceLine y={0} stroke="rgba(0,0,0,0.05)" />
-                        <Area type="monotone" dataKey="Income"   stroke={T.green} strokeWidth={2} fill="url(#gInc)" dot={false} activeDot={{ r:4, fill:T.green, stroke:"#fff", strokeWidth:2 }} />
-                        <Area type="monotone" dataKey="Expenses" stroke={T.red}   strokeWidth={2} fill="url(#gExp)" dot={false} activeDot={{ r:4, fill:T.red, stroke:"#fff", strokeWidth:2 }} />
-                        {anomalyDots.map((a,i) => (
-                          <ReferenceDot key={i} x={a.name} y={a.value} r={5} fill={T.red} stroke="rgba(229,57,53,0.25)" strokeWidth={8} />
-                        ))}
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* ── Category Donut Chart ── */}
-                {catBreakdown && catBreakdown.length > 0 && (
-                  <div style={{ background:'#FFFFFF', border:'1px solid rgba(0,0,0,0.08)', borderRadius:12, padding:'20px 22px', marginTop:12 }}>
-                    <div style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color:'#9CA3AF', marginBottom:12 }}>Spend Breakdown</div>
-                    <div style={{ display:'flex', alignItems:'center', gap:24 }}>
-                      <ResponsiveContainer width={140} height={140}>
-                        <PieChart>
-                          <Pie data={catBreakdown.slice(0,5).map(c=>({name:c[0],value:c[1]}))}
-                            cx="50%" cy="50%" innerRadius={40} outerRadius={65}
-                            paddingAngle={2} dataKey="value">
-                            {catBreakdown.slice(0,5).map((_, i) => (
-                              <Cell key={i} fill={['#E53935','#E8A020','#1A6FD4','#00B876','#6B7280'][i]} />
-                            ))}
-                          </Pie>
-                          <PieTooltip formatter={(v) => ['$'+v.toLocaleString('en-US',{maximumFractionDigits:0}), '']} contentStyle={{ fontFamily:"'Inter',sans-serif", fontSize:12, borderRadius:8, border:'1px solid rgba(0,0,0,0.08)' }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6 }}>
-                        {catBreakdown.slice(0,5).map((c, i) => (
-                          <div key={c[0]} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <div style={{ width:10, height:10, borderRadius:2, flexShrink:0, background:['#E53935','#E8A020','#1A6FD4','#00B876','#6B7280'][i] }} />
-                            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:'#3D4452', flex:1 }}>{c[0]}</span>
-                            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, fontWeight:500, color:'#0A0C10' }}>${c[1].toLocaleString('en-US',{maximumFractionDigits:0})}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Bottom split: Burn Breakdown + VaultInsights ── */}
-                <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1fr) minmax(0,1.65fr)", gap:12 }}>
-                  {/* Burn Breakdown */}
-                  <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:16, overflow:"hidden" }}>
-                    <div style={{ padding:"18px 22px 14px", borderBottom:`1px solid ${T.border}` }}>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:3 }}>Burn Breakdown</div>
-                      <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text4 }}>{MONTHS_FULL[period.m]} {period.y}</div>
-                    </div>
-                    <div style={{ padding:"16px 22px" }}>
-                      {catBreakdown.length === 0
-                        ? <div className="v-empty" style={{ padding:"30px 0" }}>No expense data this period</div>
-                        : catBreakdown.map(([cat, val]) => {
-                            const hasBudget = budgets[cat] > 0;
-                            return hasBudget ? (
-                              <BudgetBar key={cat} cat={cat} spent={val} limit={budgets[cat]} fmt={fmt} />
-                            ) : (
-                              <div key={cat} style={{ marginBottom:14 }}>
-                                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
-                                  <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, color:T.text2, fontWeight:500 }}>{cat}</span>
-                                  <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:T.text1, fontWeight:500 }}>{fmt(val)}</span>
-                                </div>
-                                <div style={{ height:3, background:"rgba(0,0,0,0.05)", borderRadius:2 }}>
-                                  <div style={{ height:"100%", width:`${monthExpenses>0?(val/monthExpenses)*100:0}%`, background:T.red, opacity:0.5, borderRadius:2, transition:"width 0.6s cubic-bezier(0.16,1,0.3,1)" }} />
-                                </div>
-                              </div>
-                            );
-                          })
-                      }
-                    </div>
-                  </div>
-
-                  {/* VaultInsights */}
-                  <VaultInsights
-                    monthIncome={monthIncome}
-                    monthExpenses={monthExpenses}
-                    momIncomePct={momIncomePct}
-                    momExpensePct={momExpensePct}
-                    savingsRate={savingsRate}
-                    runwayDays={monthExpenses > 0 && liquidity > 0 ? Math.round(liquidity / monthExpenses * 30.4375) : null}
-                    budgetAlerts={budgetAlerts}
-                    anomalies={anomalies}
-                    catBreakdown={catBreakdown}
-                    intelMsgs={intelMsgs}
-                  />
-                </div>
-
-                {/* ── Subscription Tracker ── */}
-                {(() => {
-                  const subs = txs.filter(t => t.recurring && !t.isRecurringInstance && t.type === 'expense');
-                  if (subs.length === 0) return null;
-                  const monthlyTotal = subs.reduce((s,t) => s + (t.recurringFreq==='weekly' ? t.amount*4.33 : t.amount), 0);
-                  return (
-                    <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:'20px 22px', marginTop:12 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color:T.text4 }}>Recurring Commitments</div>
-                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, fontWeight:600, color:T.gold }}>${monthlyTotal.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}/mo</div>
-                      </div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-                        {subs.map(t => (
-                          <div key={t.id} style={{ background:T.bgSubtle, border:`1px solid ${T.border}`, borderRadius:8, padding:'8px 12px', display:'flex', alignItems:'center', gap:8 }}>
-                            <div style={{ width:6, height:6, borderRadius:'50%', background:T.red, flexShrink:0 }} />
-                            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:500, color:T.text2 }}>{t.description || t.category}</span>
-                            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:T.text4 }}>${t.amount.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}/{t.recurringFreq==='weekly'?'wk':'mo'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   );
                 })()}
 
-                {/* ── Financial Velocity ── */}
-                <div style={{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"16px 20px", marginTop:12 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:20, flexWrap:"wrap" }}>
-                    <div>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:700, letterSpacing:"0.09em", textTransform:"uppercase", color:T.text4, marginBottom:6 }}>Financial Velocity · vs 3 months ago</div>
-                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <span style={{ fontSize:20 }}>{financialVelocity.improving ? "↗" : "↘"}</span>
-                        <span style={{ fontFamily:"'Inter',sans-serif", fontSize:14, fontWeight:700, color: financialVelocity.improving?T.green:T.red }}>
-                          {financialVelocity.improving ? "ACCELERATING" : "DECELERATING"}
-                        </span>
-                        <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:T.text2 }}>
-                          {financialVelocity.delta >= 0 ? "+" : ""}{fmt(Math.abs(financialVelocity.delta))} net
-                        </span>
-                        {financialVelocity.pct !== null && (
-                          <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, fontWeight:600,
-                            color: financialVelocity.improving?T.green:T.red,
-                            background: financialVelocity.improving?T.greenLight:T.redLight,
-                            padding:"2px 8px", borderRadius:6 }}>
-                            {financialVelocity.pct >= 0 ? "+" : ""}{financialVelocity.pct.toFixed(1)}%
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ flex:1 }} />
-                    {/* Mini velocity bar */}
-                    <div style={{ textAlign:"right" }}>
-                      <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, color:T.text4, marginBottom:4 }}>Trajectory</div>
-                      <div style={{ width:120, height:4, background:"rgba(0,0,0,0.06)", borderRadius:2, overflow:"hidden" }}>
-                        <div style={{
-                          height:"100%", borderRadius:2, transition:"width 1s ease",
-                          background: financialVelocity.improving?T.green:T.red,
-                          width: financialVelocity.pct === null ? "50%" : `${Math.max(5, Math.min(100, 50 + (financialVelocity.pct || 0) / 2))}%`,
-                        }} />
-                      </div>
-                    </div>
+                {/* ── EMPTY STATE ── */}
+                {txs.length === 0 && importedTxs.filter(t => !t.hidden && !t.transfer).length === 0 && (
+                  <div style={{ padding: "64px 32px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 15, fontWeight: 400, letterSpacing: "-0.02em", color: T.text2, marginBottom: 8 }}>Your vault is empty</div>
+                    <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: T.text4, letterSpacing: "-0.01em" }}>Record your first transaction to begin</div>
                   </div>
-                </div>
+                )}
 
               </div>
             )}
@@ -3258,17 +2461,22 @@ export default function Vault() {
                       </div>
 
                       {/* Month KPIs */}
-                      <div style={{ display:"flex", gap:1, background:T.border }}>
-                        {[
-                          {l:"NET",    v:fSign(monthNet),    c:monthNet>=0?T.green:T.red},
-                          {l:"INCOME", v:fmt(monthIncome),   c:valueSignColor(monthIncome)},
-                          {l:"BURN",   v:fmt(monthExpenses), c:T.red},
-                        ].map(s=>(
-                          <div key={s.l} style={{ padding:"10px 16px", background:T.bgCard }}>
-                            <div className="v-label" style={{ fontSize:7, marginBottom:4 }}>{s.l}</div>
-                            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, color:s.c, fontWeight:500, letterSpacing:"-0.03em" }}>{s.v}</div>
-                          </div>
-                        ))}
+                      <div style={{ display:"flex", alignItems:"center" }}>
+                        {/* NET — signed animated */}
+                        <div style={{ padding:"6px 20px 6px" }}>
+                          <div style={{ fontFamily:"'Inter',sans-serif", fontSize:8, fontWeight:600, letterSpacing:"0.10em", textTransform:"uppercase", color:T.text4, marginBottom:5 }}>NET</div>
+                          <AnimatedValue value={monthNet} fmt={fmt} signed fontSize={13} color={monthNet>=0?T.green:T.red} />
+                        </div>
+                        {/* INCOME */}
+                        <div style={{ padding:"6px 20px 6px", borderLeft:`1px solid ${T.border}` }}>
+                          <div style={{ fontFamily:"'Inter',sans-serif", fontSize:8, fontWeight:600, letterSpacing:"0.10em", textTransform:"uppercase", color:T.text4, marginBottom:5 }}>INCOME</div>
+                          <AnimatedValue value={monthIncome} fmt={fmt} fontSize={13} color={T.green} />
+                        </div>
+                        {/* BURN */}
+                        <div style={{ padding:"6px 20px 6px", borderLeft:`1px solid ${T.border}` }}>
+                          <div style={{ fontFamily:"'Inter',sans-serif", fontSize:8, fontWeight:600, letterSpacing:"0.10em", textTransform:"uppercase", color:T.text4, marginBottom:5 }}>BURN</div>
+                          <AnimatedValue value={monthExpenses} fmt={fmt} fontSize={13} color={T.red} />
+                        </div>
                       </div>
 
                       <div style={{ display:"flex", gap:14 }}>
@@ -3294,7 +2502,7 @@ export default function Vault() {
                       ))}
                       {Array.from({length:daysInMonth(period.y,period.m)},(_,i)=>i+1).map(day => {
                         const d=calMap[day];
-                        const isToday=day===TODAY.getDate()&&period.m===TODAY.getMonth()&&period.y===TODAY.getFullYear();
+                        const _today=getToday(); const isToday=day===_today.getDate()&&period.m===_today.getMonth()&&period.y===_today.getFullYear();
                         const isSel=selDay===day;
                         const dayNet=d?(d.income-d.expense):0;
                         const hasGain=d&&d.income>d.expense;
@@ -3330,31 +2538,6 @@ export default function Vault() {
                                 </div>
                               )}
 
-                              {d && (
-                                <div style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  width: 18,
-                                  height: 18,
-                                  flexShrink: 0,
-                                  fontFamily: "'JetBrains Mono', monospace",
-                                  fontSize: 7,
-                                  fontWeight: 500,
-                                  lineHeight: 1,
-                                  color: "#F5F7FA",
-                                  background: dayNet >= 0
-                                    ? "linear-gradient(180deg, rgba(70,231,169,0.06), rgba(70,231,169,0.02))"
-                                    : "linear-gradient(180deg, rgba(255,127,159,0.07), rgba(255,127,159,0.025))",
-                                  border: dayNet >= 0
-                                    ? "1px solid rgba(70,231,169,0.10)"
-                                    : "1px solid rgba(255,127,159,0.12)",
-                                  borderRadius: 999,
-                                  boxShadow: "inset 0 0 8px rgba(0,0,0,0.16)",
-                                }}>
-                                  {d.txs.length}
-                                </div>
-                              )}
                             </div>
 
                             {/* ── CENTERED net amount + sub-row ── */}
@@ -3381,28 +2564,7 @@ export default function Vault() {
                                   {fmtCalDay(dayNet, currency)}
                                 </div>
 
-                                {/* Sub-row: income + expense when both exist */}
-                                {d.income > 0 && d.expense > 0 && (
-                                  <div style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    gap: 2,
-                                  }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                                      <div style={{ width: 3, height: 3, borderRadius: "50%", background: T.green, flexShrink: 0 }} />
-                                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "rgba(70,231,169,0.6)" }}>
-                                        {fmtCalDay(d.income, currency).replace(/^[+−]/, "")}
-                                      </span>
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                                      <div style={{ width: 3, height: 3, borderRadius: "50%", background: T.red, flexShrink: 0 }} />
-                                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "rgba(255,127,159,0.6)" }}>
-                                        {fmtCalDay(-d.expense, currency).replace(/^[+−]/, "")}
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
+
                               </div>
                             )}
                           </div>
@@ -3415,49 +2577,59 @@ export default function Vault() {
                   <div className="v-panel" style={{ position:"sticky", top:0, alignSelf:"start" }}>
                     {selDay && dayData ? (
                       <>
+                        {/* Header: date + net */}
                         <div className="v-panel-header">
-                          <div className="v-label" style={{ fontSize:7.5, marginBottom:3 }}>{MONTHS_FULL[period.m].toUpperCase()} {selDay}, {period.y}</div>
-                          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:26, fontWeight:500, letterSpacing:"-0.05em", color:dayData.income-dayData.expense>=0?T.green:T.red, marginBottom:12 }}>
+                          <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:600, letterSpacing:"0.10em", textTransform:"uppercase", color:T.text4, marginBottom:10 }}>
+                            {MONTHS_FULL[period.m]} {selDay}, {period.y}
+                          </div>
+                          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:28, fontWeight:400, letterSpacing:"-0.05em", color:dayData.income-dayData.expense>=0?T.green:T.red, lineHeight:1, marginBottom:16 }}>
                             {fSign(dayData.income-dayData.expense)}
                           </div>
-                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:1, background:T.border }}>
+                          {/* Inline income / burn row */}
+                          <div style={{ display:"flex", alignItems:"center", gap:0 }}>
                             {dayData.income > 0 && (
-                              <div style={{ padding:"10px 13px", background:T.greenLight }}>
-                                <div className="v-label" style={{ fontSize:7, color:T.green, marginBottom:4 }}>INCOME</div>
-                                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, color:T.green, fontWeight:500 }}>{fmt(dayData.income)}</div>
+                              <div style={{ flex:1 }}>
+                                <div style={{ fontFamily:"'Inter',sans-serif", fontSize:8, fontWeight:600, letterSpacing:"0.10em", textTransform:"uppercase", color:T.text4, marginBottom:4 }}>Income</div>
+                                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, fontWeight:400, color:T.green, letterSpacing:"-0.03em" }}>{fmt(dayData.income)}</div>
                               </div>
                             )}
+                            {dayData.income > 0 && dayData.expense > 0 && (
+                              <div style={{ width:1, height:28, background:T.border, flexShrink:0, margin:"0 14px" }} />
+                            )}
                             {dayData.expense > 0 && (
-                              <div style={{ padding:"10px 13px", background:T.redLight }}>
-                                <div className="v-label" style={{ fontSize:7, color:T.red, marginBottom:4 }}>BURN</div>
-                                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, color:T.red, fontWeight:500 }}>{fmt(dayData.expense)}</div>
+                              <div style={{ flex:1 }}>
+                                <div style={{ fontFamily:"'Inter',sans-serif", fontSize:8, fontWeight:600, letterSpacing:"0.10em", textTransform:"uppercase", color:T.text4, marginBottom:4 }}>Burn</div>
+                                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, fontWeight:400, color:T.red, letterSpacing:"-0.03em" }}>{fmt(dayData.expense)}</div>
                               </div>
                             )}
                           </div>
                         </div>
-                        <div style={{ padding:"12px 14px 16px", maxHeight:500, overflowY:"auto" }}>
+
+                        {/* Transaction list — lean rows */}
+                        <div style={{ overflowY:"auto", maxHeight:460 }}>
                           {[...dayData.txs].sort((a,b)=>a.type.localeCompare(b.type)).map((tx,i) => {
                             const isInc=tx.type==="income";
-                            const tags=tx.tags?tx.tags.split(",").map(t=>t.trim()).filter(Boolean):[];
                             return (
-                              <div key={i} style={{ padding:"13px 14px", background:T.bgSubtle, border:`1px solid ${T.border}`, marginBottom:6, borderLeft:`3px solid ${isInc?T.green:T.red}` }}>
-                                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
-                                  <div>
-                                    <span className="v-badge" style={{ background:isInc?T.greenLight:T.redLight, color:isInc?T.green:T.red, marginBottom:4, display:"inline-flex" }}>{tx.type}</span>
-                                    <div style={{ fontSize:12, fontWeight:600, color:T.text1 }}>{tx.category}</div>
+                              <div key={i} style={{ padding:"13px 16px", borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:500, color:T.text1, letterSpacing:"-0.01em", marginBottom:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                    {tx.description || tx.category}
                                   </div>
-                                  <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:14, fontWeight:500, color:isInc?T.green:T.red }}>
-                                    {isInc?"+":"−"}{fmt(tx.amount)}
-                                  </span>
+                                  <div style={{ fontFamily:"'Inter',sans-serif", fontSize:10, color:T.text4, letterSpacing:"0.02em" }}>
+                                    {tx.category}{tx.description && tx.description !== tx.category ? "" : ""}
+                                  </div>
+                                  <div style={{ display:"flex", gap:8, marginTop:6 }}>
+                                    {!tx.isRecurringInstance && (
+                                      <button className="v-btn-ghost" onClick={()=>openEdit(tx)} style={{ fontSize:9, letterSpacing:"0.08em" }}>EDIT</button>
+                                    )}
+                                    <button className="v-btn-ghost" onClick={()=>{handleDelete(tx);if(calMap[selDay]?.txs.length<=1)setSelDay(null);}}
+                                      style={{ fontSize:9, letterSpacing:"0.08em", color:T.text4 }}
+                                      onMouseEnter={e=>e.currentTarget.style.color=T.red}
+                                      onMouseLeave={e=>e.currentTarget.style.color=T.text4}>DEL</button>
+                                  </div>
                                 </div>
-                                {tx.description && <div style={{ fontSize:11, color:T.text2, marginBottom:6 }}>{tx.description}</div>}
-                                {tags.length>0 && (<div style={{ display:"flex", gap:3, flexWrap:"wrap", marginBottom:8 }}>{tags.map((tag,j)=><span key={j} className="v-tag">{tag}</span>)}</div>)}
-                                <div style={{ display:"flex", gap:10 }}>
-                                  {!tx.isRecurringInstance && <button className="v-btn-ghost" onClick={()=>openEdit(tx)}>EDIT</button>}
-                                  <button className="v-btn-ghost" onClick={()=>{handleDelete(tx);if(calMap[selDay]?.txs.length<=1)setSelDay(null);}}
-                                    style={{ color:T.text3 }}
-                                    onMouseEnter={e=>e.currentTarget.style.color=T.red}
-                                    onMouseLeave={e=>e.currentTarget.style.color=T.text3}>DELETE</button>
+                                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:14, fontWeight:400, color:isInc?T.green:T.red, letterSpacing:"-0.04em", flexShrink:0 }}>
+                                  {isInc?"+":"−"}{fmt(tx.amount)}
                                 </div>
                               </div>
                             );
@@ -3468,13 +2640,28 @@ export default function Vault() {
                       <div style={{ padding:"36px 20px", textAlign:"center" }}>
                         <div className="v-label" style={{ fontSize:7.5, marginBottom:8 }}>{MONTHS_FULL[period.m].toUpperCase()} {selDay}</div>
                         <div style={{ fontSize:11.5, color:T.text3, marginBottom:20, lineHeight:1.7 }}>No transactions recorded.</div>
-                        <button onClick={()=>{setForm({...blankForm(cats),date:`${period.y}-${String(period.m+1).padStart(2,"0")}-${String(selDay).padStart(2,"0")}`});setModal("tx");}}
+                        <button onClick={()=>{setForm({...blankForm(cats),date:`${period.y}-${String(period.m+1).padStart(2,"0")}-${String(selDay).padStart(2,"0")}`});setNewTxView(true);}}
                           className="v-btn-secondary" style={{ fontSize:8, letterSpacing:"0.18em" }}>RECORD ENTRY</button>
                       </div>
                     ) : (
-                      <div style={{ padding:"64px 20px", textAlign:"center" }}>
-                        <div className="v-label" style={{ fontSize:7.5, marginBottom:8 }}>Day Detail</div>
-                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10.5, color:T.text4, lineHeight:1.9 }}>Select a date to view its transactions.</div>
+                      <div style={{ padding: "20px 16px" }}>
+                        <div style={{ fontFamily:"'Inter',sans-serif", fontSize:9, fontWeight:600, letterSpacing:"0.10em", textTransform:"uppercase", color:T.text4, marginBottom:18 }}>
+                          {MONTHS_SHORT[period.m]} {period.y}
+                        </div>
+                        {[
+                          { label: "Income",       value: fmt(monthIncome),   color: monthIncome > 0 ? T.green : T.text4 },
+                          { label: "Burn",         value: fmt(monthExpenses), color: monthExpenses > 0 ? T.red : T.text4 },
+                          { label: "Net",          value: fSign(monthNet),    color: monthNet > 0 ? T.green : monthNet < 0 ? T.red : T.text4 },
+                          { label: "Transactions", value: `${monthTxs.filter(t=>!t.isRecurringInstance).length}`, color: T.text2 },
+                        ].map(({ label, value, color }) => (
+                          <div key={label} style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", padding:"10px 0", borderBottom:`1px solid ${T.border}` }}>
+                            <span style={{ fontFamily:"'Inter',sans-serif", fontSize:11, color:T.text3, letterSpacing:"-0.01em" }}>{label}</span>
+                            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, fontWeight:400, color, letterSpacing:"-0.04em" }}>{value}</span>
+                          </div>
+                        ))}
+                        <div style={{ marginTop:24, fontFamily:"'Inter',sans-serif", fontSize:9, color:T.text4, letterSpacing:"0.08em", textTransform:"uppercase", textAlign:"center" }}>
+                          Select a date
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3485,158 +2672,108 @@ export default function Vault() {
             {/* ─── LEDGER ─── */}
             {view === "ledger" && (
               <>
-                {/* ── KPI bar: 4-col desktop / 2×2 mobile ── */}
-                <div
-                  className="v-ledger-kpi-bar"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4,1fr)",
-                    background: T.border,
-                    gap: 1,
-                    marginBottom: 14,
-                    border: `1px solid ${T.border}`,
-                  }}
-                >
-                  {[
-                    { label:"Total Capital",  value:fmt(liquidity),      color:T.text1, sub:"All-time net" },
-                    { label:isFiltered?"Period Income":"All-Time Income",    value:fmt(shownIncome), color:valueSignColor(shownIncome), sub:`${txs.filter(t=>t.type==="income").length} records` },
-                    { label:isFiltered?"Period Burn":"All-Time Burn",         value:fmt(isFiltered?(ledgerTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0)):ledgerExpenses), color:T.red, sub:`${txs.filter(t=>t.type==="expense").length} records` },
-                    { label:isFiltered?"Period Net":"All-Time Net",
-                      value:fSign(isFiltered?(ledgerTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0)-ledgerTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0)):ledgerIncome-ledgerExpenses),
-                      color:(isFiltered?(ledgerTxs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0)-ledgerTxs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0)):ledgerIncome-ledgerExpenses)>=0?T.green:T.red,
-                      sub:`${ledgerTxs.length} shown${isFiltered?" (filtered)":""}`, last:true },
-                  ].map(({ label, value, color, sub, last }) => (
-                    <div key={label} className="v-kpi-card" style={{ borderRight:last?"none":`1px solid ${T.border}` }}>
-                      <div className="v-kpi-label">{label}</div>
-                      <div className="v-kpi-value" style={{ color }}>{value}</div>
-                      <div className="v-kpi-sub">{sub}</div>
+                {/* ── Hero Summary ── */}
+                <div className="ldg-hero">
+                  <div className="ldg-hero-eyebrow">
+                    {ledgerSearchActive ? "Filtered Net" : "All-Time Net"}
+                  </div>
+                  <AnimatedValue
+                    value={ledgerSearchNet}
+                    fmt={fmt}
+                    signed
+                    fontSize={42}
+                    color={ledgerSearchNet >= 0 ? T.green : T.red}
+                    style={{ letterSpacing: "-0.05em", lineHeight: 1 }}
+                  />
+                  <div className="ldg-hero-breakdown">
+                    <div className="ldg-hero-stat">
+                      <span className="ldg-hero-stat-label">Income</span>
+                      <span className="ldg-hero-stat-value" style={{ color: T.green }}>{fmt(ledgerSearchIncome)}</span>
                     </div>
-                  ))}
+                    <div className="ldg-hero-sep" />
+                    <div className="ldg-hero-stat">
+                      <span className="ldg-hero-stat-label">Expenses</span>
+                      <span className="ldg-hero-stat-value" style={{ color: T.red }}>{fmt(ledgerSearchExpenses)}</span>
+                    </div>
+                    <div className="ldg-hero-sep" />
+                    <div className="ldg-hero-stat">
+                      <span className="ldg-hero-stat-label">Records</span>
+                      <span className="ldg-hero-stat-value" style={{ color: T.text2 }}>{ledgerTxs.length}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="v-filter-bar">
-                  <div className="v-search-wrap">
+                {/* ── Filter bar ── */}
+                <div className="ldg-filter-bar">
+                  <div className="v-search-wrap ldg-search-wrap">
                     <span className="v-search-icon">⌕</span>
-                    <input type="text" className="v-search-input"
-                      placeholder="Search description, category, tags, amount…"
-                      value={ledgerSearch} onChange={e=>setLedgerSearch(e.target.value)} />
+                    <input type="text" className="v-search-input ldg-search-input"
+                      placeholder="Search transactions…"
+                      value={ledgerSearch} onChange={e => setLedgerSearch(e.target.value)} />
                     {ledgerSearch && (
-                      <button className="v-search-clear" onClick={()=>setLedgerSearch("")}>×</button>
+                      <button className="v-search-clear" onClick={() => setLedgerSearch("")}>×</button>
                     )}
                   </div>
-                  <DateRangeFilter from={ledgerFrom} to={ledgerTo} onFrom={setLedgerFrom} onTo={setLedgerTo} onClear={()=>{setLedgerFrom("");setLedgerTo("");}} />
-                </div>
-
-                {/* ── Search Summary Bar ── */}
-                {ledgerSearchActive && (
-                  <div className="v-search-summary">
-                    <div className="v-search-summary-item">
-                      <span className="v-search-summary-label">Results</span>
-                      <span className="v-search-summary-value" style={{ color:T.text2, fontSize:16 }}>
-                        {ledgerTxs.length} <span style={{ fontSize:9, color:T.text3, letterSpacing:"0.1em" }}>TX</span>
-                      </span>
-                    </div>
-                    <div style={{ width:1, height:32, background:T.border, flexShrink:0 }} />
-                    {ledgerSearchExpenses > 0 && (
-                      <div className="v-search-summary-item">
-                        <span className="v-search-summary-label">Total Spend</span>
-                        <span className="v-search-summary-value" style={{ color:T.red }}>{fmt(ledgerSearchExpenses)}</span>
-                      </div>
-                    )}
-                    {ledgerSearchIncome > 0 && (
-                      <div className="v-search-summary-item">
-                        <span className="v-search-summary-label">Total Income</span>
-                        <span className="v-search-summary-value" style={{ color:T.green }}>{fmt(ledgerSearchIncome)}</span>
-                      </div>
-                    )}
-                    {ledgerSearchIncome > 0 && ledgerSearchExpenses > 0 && (
-                      <>
-                        <div style={{ width:1, height:32, background:T.border, flexShrink:0 }} />
-                        <div className="v-search-summary-item">
-                          <span className="v-search-summary-label">Net</span>
-                          <span className="v-search-summary-value" style={{ color:ledgerSearchNet>=0?T.green:T.red }}>{fSign(ledgerSearchNet)}</span>
-                        </div>
-                      </>
-                    )}
-                    {ledgerSearch.trim() && (
-                      <>
-                        <div style={{ flex:1 }} />
-                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:8, color:T.text4, letterSpacing:"0.14em", alignSelf:"center" }}>
-                          QUERY: <span style={{ color:T.gold }}>{ledgerSearch.trim().toUpperCase()}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ display:"flex", alignItems:"center", gap:0, padding:"8px 0 10px", borderBottom:`1px solid rgba(0,0,0,0.06)`, marginBottom:1 }}>
-                  <div className="v-filter-chips">
-                    {[["all","All"],["income","Income"],["expense","Burn"]].map(([val,lbl])=>(
-                      <button key={val} onClick={()=>setTxFilter(val)} className={`v-filter-chip${txFilter===val?" active":""}`}>{lbl.toUpperCase()}</button>
+                  <div className="ldg-pills">
+                    {[["all","All"],["income","Income"],["expense","Expenses"]].map(([val,lbl]) => (
+                      <button key={val} className={`ldg-pill${txFilter===val?" active":""}`}
+                        onClick={() => setTxFilter(val)}>{lbl}</button>
                     ))}
                   </div>
-                  <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:16 }}>
-                    <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:T.text3, letterSpacing:"0.06em" }}>
-                      {ledgerTxs.length} record{ledgerTxs.length!==1?"s":""}
-                      {isFiltered && <span style={{ color:T.gold, marginLeft:6 }}>· FILTERED</span>}
-                    </span>
+                  <DateRangeFilter from={ledgerFrom} to={ledgerTo} onFrom={setLedgerFrom} onTo={setLedgerTo}
+                    onClear={() => { setLedgerFrom(""); setLedgerTo(""); }} />
+                  <div className="ldg-exports">
                     <button className="v-btn-ghost" onClick={exportCSV}>CSV ↓</button>
                     <button className="v-btn-ghost" onClick={exportJSON}>JSON ↓</button>
                   </div>
                 </div>
 
-                <div className="v-panel">
-                  <TxFeed txs={ledgerTxs} onEdit={openEdit} onDelete={handleDelete} fmt={fmt} />
-                </div>
+                {/* ── Transaction list ── */}
+                <TxFeed txs={ledgerTxs} onEdit={openEdit} onDelete={handleDelete} fmt={fmt} />
               </>
             )}
 
-            {/* ─── MISSION ─── */}
-            {view === "mission" && <VaultMission />}
+            {/* ─── BANKS ─── */}
+            {view === "banks" && (
+              <div style={{ paddingBottom: 60 }}>
+                <div style={{ padding: "28px 32px 0", borderBottom: `1px solid ${T.border}`, marginBottom: 0 }}>
+                  <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: T.text4, marginBottom: 8 }}>
+                    Connected Banks
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 400, letterSpacing: "-0.02em", color: T.text1, marginBottom: 24 }}>
+                    Bank Sync
+                  </div>
+                </div>
+
+                <VaultBankConnect
+                  session={session}
+                  onConnected={refetchPlaid}
+                  T={T}
+                />
+
+                <VaultConnectedAccounts
+                  session={session}
+                  items={plaidItems}
+                  syncing={plaidSyncing}
+                  onSync={triggerSync}
+                  onDisconnect={refetchPlaid}
+                  T={T}
+                />
+              </div>
+            )}
 
             {/* ─── SETTINGS ─── */}
             {view === "settings" && (
               <>
                 <div className="v-settings-tabs">
-                  {[["appearance","Appearance"],["data","Data"],["budgets","Budgets"],["categories","Categories"],["mockdata","Sample Data"],["danger","Danger Zone"]].map(([id,lbl])=>(
+                {[["data","Data"],["budgets","Budgets"],["categories","Categories"],["mockdata","Sample Data"],["danger","Danger Zone"]].map(([id,lbl])=>(
                     <button key={id} onClick={()=>setSettingsTab(id)} className={`v-settings-tab${settingsTab===id?" active":""}`}>{lbl}</button>
                   ))}
                 </div>
 
-                {settingsTab==="appearance" && (
-                  <div style={{ padding:'24px 0' }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:T.text3, marginBottom:20, letterSpacing:'0.08em', textTransform:'uppercase' }}>Theme</div>
-                    <div style={{ display:'flex', gap:16 }}>
-                      {[['light','☀️','Clean & bright'],['dark','🌙','Vault aesthetic']].map(([mode,icon,desc]) => (
-                        <div key={mode} onClick={() => { setTheme(mode); localStorage.setItem('vault_theme', mode); }}
-                          style={{ cursor:'pointer', borderRadius:16, padding:'24px 20px', width:160, textAlign:'center',
-                            border:`2px solid ${theme===mode ? T.blue : T.border}`,
-                            background: theme===mode ? T.blueLight : T.bgCard,
-                            transition:'all 200ms ease', boxShadow: theme===mode ? `0 0 0 4px ${T.blueLight}` : 'none' }}>
-                          <div style={{ fontSize:28, marginBottom:10 }}>{icon}</div>
-                          <div style={{ fontWeight:600, color: theme===mode ? T.blue : T.text1, textTransform:'capitalize', fontSize:14 }}>{mode}</div>
-                          <div style={{ fontSize:11, color:T.text3, marginTop:5 }}>{desc}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {settingsTab==="data" && (
                   <div className="v-settings-grid">
                     <SettingsCard title="Backup & Restore" desc="Export a complete JSON backup of all data including budgets, categories, and settings. Import to restore.">
-                    <SettingsCard
-                        title="Monthly Statement"
-                        desc={`Export a branded PDF statement for ${MONTHS_FULL[period.m]} ${period.y}. Includes capital summary, category breakdown, and full transaction ledger.`}
-                      >
-                        <VaultExportButton
-                          period={period}
-                          txs={txs}
-                          baseLiq={baseLiq}
-                          accountEmail={accountEmail}
-                          budgets={budgets}
-                        />
-                      </SettingsCard>
                       <button onClick={exportJSON} className="v-btn-primary" style={{ width:"auto", padding:"9px 16px" }}>EXPORT JSON</button>
                       <label className="v-btn-secondary" style={{ cursor:"pointer" }}>
                         IMPORT JSON
@@ -3644,8 +2781,26 @@ export default function Vault() {
                           onChange={async e => { const f=e.target.files?.[0]; e.target.value=""; if(!f)return; try{await importFile(f);}catch(err){addToast(err?.message||"Import failed","err");} }} />
                       </label>
                     </SettingsCard>
+                    <SettingsCard
+                      title={<span style={{ display:'flex', alignItems:'center', gap:6 }}>Monthly Statement <ProBadge /></span>}
+                      desc={`Export a branded PDF statement for ${MONTHS_FULL[period.m]} ${period.y}. Includes capital summary, category breakdown, and full transaction ledger.`}
+                    >
+                      <VaultExportButton
+                        period={period}
+                        txs={txs}
+                        baseLiq={baseLiq}
+                        accountEmail={accountEmail}
+                        budgets={budgets}
+                      />
+                    </SettingsCard>
                     <SettingsCard title="CSV Export" desc="Export all transactions as CSV for use in Excel, Google Sheets, or reporting tools.">
                       <button onClick={exportCSV} className="v-btn-secondary">EXPORT CSV</button>
+                    </SettingsCard>
+                    <SettingsCard
+                      title={<span style={{ display:'flex', alignItems:'center', gap:6 }}>Multi-Entity Support <ProBadge /></span>}
+                      desc="Manage separate ledgers for multiple business entities or income streams — switching between them without data mixing."
+                    >
+                      <button disabled style={{ padding:'9px 16px', background:T.bgSubtle, border:`1px solid ${T.border}`, borderRadius:6, fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600, color:T.text4, cursor:'not-allowed', letterSpacing:'0.04em' }}>Coming Soon</button>
                     </SettingsCard>
                   </div>
                 )}
@@ -3779,23 +2934,12 @@ export default function Vault() {
               </>
             )}
 
-            {/* ─── FORECAST ─── */}
-            {view === "forecast" && (
-              <VaultForecast
-                txs={txs}
-                baseLiquidity={baseLiq}
-                period={period}
-                monthlyChartData={monthlyChartData}
-              />
-            )}
 
-            {/* ─── GOALS ─── */}
-            {view === "goals" && (
-              <VaultGoals
-                goals={goals}
-                liquidity={liquidity}
-                onUpdateGoals={setGoals}
-              />
+            {/* ─── INVESTMENTS / LIABILITIES ─── */}
+            {view === "investments" && (
+              <ErrorBoundary>
+                <VaultInvestments T={T} fmt={fmt} />
+              </ErrorBoundary>
             )}
 
             </div>
@@ -3805,7 +2949,7 @@ export default function Vault() {
 
       {/* ── MOBILE BOTTOM NAV ── */}
       <div className="v-mobile-bottomnav">
-        {[["overview","Overview"],["calendar","Calendar"],["ledger","Ledger"],["settings","Settings"],["mission","Mission"]].map(([id,lbl])=>(
+        {[["overview","Overview"],["calendar","Calendar"],["ledger","Ledger"],["settings","Settings"]].map(([id,lbl])=>(
           <button key={id} className={`v-mobile-nav-item${view===id?" active":""}`} onClick={()=>setView(id)}>
             {NavIcons[id]}
             <span>{lbl}</span>
@@ -3813,119 +2957,22 @@ export default function Vault() {
         ))}
       </div>
 
-      <button className="v-mobile-add-fab" onClick={openAdd}>+</button>
+      <button className="v-mobile-add-fab" onClick={() => { setEditId(null); setForm({ ...blankForm(cats) }); setNewTxView(true); }}>+</button>
 
       {/* ── TRANSACTION MODAL ── */}
-      {modal === "tx" && (
-        <Modal onClose={() => { setModal(null); setEditId(null); setForm(blankForm(cats)); }}>
-          <div className="v-label" style={{ fontSize:7.5, marginBottom:4 }}>{editId?"Edit Record":"New Record"}</div>
-          <div style={{ fontFamily:"'Inter',sans-serif", fontSize:16, fontWeight:700, letterSpacing:"-0.01em", marginBottom:22, color:T.text1 }}>
-            {editId ? "Edit Transaction" : "Record Transaction"}
-          </div>
-
-          <div className="v-type-toggle">
-            {["expense","income"].map(t=>(
-              <button key={t} onClick={()=>setForm(f=>({...f,type:t,category:t==="income"?cats.income[0]:cats.expense[0]}))}
-                className={`v-type-btn${form.type===t?" active-"+t:""}`}>
-                {t==="expense"?"BURN":"INCOME"}
-              </button>
-            ))}
-          </div>
-
-          <div className="v-field">
-            <label className="v-field-label">Amount</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              autoFocus
-              value={amountDisplay}
-              className="v-amount-display"
-              onChange={() => {}}
-              onKeyDown={e => {
-                if (e.key >= "0" && e.key <= "9") {
-                  e.preventDefault();
-                  setForm(f => ({ ...f, amount: (f.amount + e.key).slice(0, 10) }));
-                } else if (e.key === "Backspace" || e.key === "Delete") {
-                  e.preventDefault();
-                  setForm(f => ({ ...f, amount: f.amount.slice(0, -1) }));
-                } else if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitTx();
-                }
-              }}
-              style={{
-                width:"100%",
-                background:"#FFFFFF",
-                border:`1.5px solid rgba(0,0,0,0.12)`,
-                borderRadius:8,
-                padding:"18px 14px 14px",
-                color: parseInt(form.amount||"0",10) === 0 ? T.text4 : (form.type==="income"?T.green:T.red),
-                fontFamily:"'JetBrains Mono',monospace",
-                fontSize:38,
-                fontWeight:400,
-                letterSpacing:"-0.04em",
-                textAlign:"center",
-                caretColor:"transparent",
-                transition:"border-color 150ms, color 150ms",
-                display:"block",
-              }}
-              onFocus={e => e.target.style.borderColor = "#1A6FD4"}
-              onBlur={e => e.target.style.borderColor = "rgba(0,0,0,0.12)"}
-            />
-            <div className="v-amount-hint">Type digits · Backspace to clear</div>
-          </div>
-
-          <div className="v-field">
-            <label className="v-field-label">Category</label>
-            <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={inputSx}>
-              {cats[form.type].map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div className="v-field">
-            <label className="v-field-label">Date</label>
-            <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}
-              style={{ ...inputSx, fontFamily:"'JetBrains Mono',monospace", colorScheme:"dark" }} />
-          </div>
-          <div className="v-field">
-            <label className="v-field-label">Description</label>
-            <input type="text" placeholder="Memo…" value={form.description}
-              onChange={e=>setForm(f=>({...f,description:e.target.value}))}
-              onKeyDown={e=>e.key==="Enter"&&commitTx()}
-              style={inputSx} />
-          </div>
-          <div className="v-field">
-            <label className="v-field-label">Tags</label>
-            <input type="text" placeholder="client-a, q3 (comma-separated)" value={form.tags}
-              onChange={e=>setForm(f=>({...f,tags:e.target.value}))} style={inputSx} />
-          </div>
-
-          <div className="v-toggle-wrapper">
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:form.recurring?14:0 }}>
-              <div>
-                <div style={{ fontSize:12, color:T.text2, fontWeight:500 }}>Recurring Entry</div>
-                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9.5, color:T.text3, marginTop:2, letterSpacing:"0.04em" }}>Projects forward automatically</div>
-              </div>
-              <button onClick={()=>setForm(f=>({...f,recurring:!f.recurring}))}
-                className="v-toggle" style={{ borderColor:form.recurring?T.blue:T.border }}>
-                <div className="v-toggle-thumb" style={{ left:form.recurring?19:2, background:form.recurring?T.blue:T.text3 }} />
-              </button>
-            </div>
-            {form.recurring && (
-              <div>
-                <label className="v-field-label" style={{ marginBottom:7 }}>Frequency</label>
-                <select value={form.recurringFreq} onChange={e=>setForm(f=>({...f,recurringFreq:e.target.value}))} style={{ ...inputSx, fontSize:12 }}>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          <div className="v-modal-actions">
-            <button onClick={()=>{setModal(null);setEditId(null);setForm(blankForm(cats));}} className="v-btn-secondary">Cancel</button>
-            <button onClick={commitTx} className="v-btn-primary">{editId?"Save Changes":"Record"}</button>
-          </div>
-        </Modal>
+      {newTxView && form && (
+        <TransactionDrawer
+          open={newTxView}
+          onClose={() => { setNewTxView(false); setEditId(null); setForm(blankForm(cats)); }}
+          form={form}
+          setForm={setForm}
+          editId={editId}
+          cats={cats}
+          amountDisplay={amountDisplay}
+          commitTx={commitTx}
+          T={T}
+          theme={theme}
+        />
       )}
 
       {scopeAction && (
@@ -3938,14 +2985,71 @@ export default function Vault() {
         />
       )}
 
+      {modal === "health-info" && (
+        <Modal onClose={() => setModal(null)} width={440}>
+          <div style={{ fontFamily:"'Inter',sans-serif" }}>
+            <div style={{ fontSize:15, fontWeight:700, color:T.text1, marginBottom:16, letterSpacing:"-0.02em" }}>How the Health Score is Calculated</div>
+            <div style={{ fontSize:12, color:T.text3, lineHeight:1.7, marginBottom:16 }}>
+              The score (0–100) weights five financial signals:
+            </div>
+            {[
+              { label:"Base", pts:"40 pts", desc:"Starting baseline — everyone begins here." },
+              { label:"Liquidity buffer", pts:"±15 pts", desc:"Positive available capital adds 15 points; negative deducts." },
+              { label:"Savings rate", pts:"up to +25 pts", desc:"20%+ savings rate adds 25. 10–20% adds 18. 0–10% adds 8. Negative deducts 5." },
+              { label:"Runway", pts:"up to +15 pts", desc:"12+ months adds 15. 6–12 months adds 12. 3–6 months adds 6. Under 3 months: 0." },
+              { label:"Budget discipline", pts:"up to +5 pts", desc:"No categories over budget: +5. Some overages reduce or eliminate this bonus." },
+            ].map(({ label, pts, desc }) => (
+              <div key={label} style={{ display:"flex", gap:12, marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${T.border}` }}>
+                <div style={{ flexShrink:0, width:140 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:T.text1 }}>{label}</div>
+                  <div style={{ fontSize:10, fontFamily:"'JetBrains Mono',monospace", color:T.blue, marginTop:2 }}>{pts}</div>
+                </div>
+                <div style={{ fontSize:12, color:T.text3, lineHeight:1.6 }}>{desc}</div>
+              </div>
+            ))}
+            <div style={{ fontSize:11, color:T.text4, marginTop:8, fontStyle:"italic" }}>
+              Scores are a directional signal, not a precise grade. They reset each period as your data changes.
+            </div>
+            <button onClick={() => setModal(null)} className="v-btn-secondary" style={{ marginTop:20, width:"100%", padding:"10px 0" }}>Close</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal === "shortcuts" && (
+        <Modal onClose={() => setModal(null)} width={400}>
+          <div style={{ fontFamily:"'Inter',sans-serif" }}>
+            <div style={{ fontSize:15, fontWeight:700, color:T.text1, marginBottom:16, letterSpacing:"-0.02em" }}>Keyboard Shortcuts</div>
+            {[
+              ["N", "New transaction"],
+              ["[  ]", "Previous / next period"],
+              ["← →", "Previous / next period"],
+              ["/", "Open command palette"],
+              ["⌘K / Ctrl+K", "Open command palette"],
+              ["?", "Show shortcuts"],
+              ["1–6", "Navigate views"],
+              ["Esc", "Close modal / drawer"],
+            ].map(([key, desc]) => (
+              <div key={key} style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                padding:"8px 0", borderBottom:`1px solid ${T.border}` }}>
+                <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:T.blue,
+                  background:T.bgSubtle, padding:"2px 8px", borderRadius:4, border:`1px solid ${T.border}` }}>{key}</span>
+                <span style={{ fontSize:12, color:T.text3 }}>{desc}</span>
+              </div>
+            ))}
+            <button onClick={() => setModal(null)} className="v-btn-secondary" style={{ marginTop:16, width:"100%", padding:"10px 0" }}>Close</button>
+          </div>
+        </Modal>
+      )}
+
       {showCommandPalette && (
         <VaultCommandPalette
           onClose={() => setShowCommandPalette(false)}
           onNavigate={setView}
-          onAddIncome={() => { openAdd(); }}
-          onAddExpense={() => { openAdd(); }}
+          onAddIncome={() => openAdd("income")}
+          onAddExpense={() => openAdd("expense")}
           onExportPDF={() => { exportStatement({ txs, baseLiq, budgets, period, fmt, fSign }); }}
           onLoadSample={loadMockData}
+          T={T}
         />
       )}
 
