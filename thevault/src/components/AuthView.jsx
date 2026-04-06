@@ -482,6 +482,8 @@ export default function AuthView({ onAuth, initialTab, planHint, calcContext, on
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState('');
   const [magicSent, setMagicSent]       = useState(false);
+  const [showForgot, setShowForgot]     = useState(false);
+  const [forgotSent, setForgotSent]     = useState(false);
   const [emailWasSaved, setEmailWasSaved] = useState(false);
 
   const inputRef = useRef(null);
@@ -574,6 +576,21 @@ export default function AuthView({ onAuth, initialTab, planHint, calcContext, on
       onAuth(data.session);
     } catch (e) {
       setError(e?.message || 'Could not create account. Please try again.');
+    } finally { setLoading(false); }
+  };
+
+  /* Forgot password */
+  const handleForgot = async () => {
+    if (!email.trim()) { setError('Enter your email address first.'); return; }
+    setLoading(true); setError('');
+    try {
+      const { error: e } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin,
+      });
+      if (e) throw e;
+      setForgotSent(true);
+    } catch(e) {
+      setError(e?.message || 'Could not send reset email.');
     } finally { setLoading(false); }
   };
 
@@ -777,6 +794,30 @@ export default function AuthView({ onAuth, initialTab, planHint, calcContext, on
               {mode === 'signin' && magicSent && (
                 <div className="g-magic-sent">
                   Check your inbox — link sent.
+                </div>
+              )}
+
+              {/* Forgot password — sign in only */}
+              {mode === 'signin' && !forgotSent && (
+                <button
+                  type="button"
+                  onClick={showForgot ? handleForgot : () => setShowForgot(true)}
+                  disabled={loading}
+                  style={{
+                    background:'none', border:'none', cursor:'pointer',
+                    fontFamily:"'Inter',sans-serif", fontSize:12,
+                    color:'rgba(255,255,255,0.30)', letterSpacing:'0.01em',
+                    padding:'2px 0', marginTop:2, textAlign:'center', width:'100%',
+                  }}
+                >
+                  {showForgot
+                    ? (loading ? 'Sending…' : `Send reset link to ${email || 'your email'}`)
+                    : 'Forgot password?'}
+                </button>
+              )}
+              {mode === 'signin' && forgotSent && (
+                <div style={{ fontSize:12, color:'rgba(255,255,255,0.40)', marginTop:4, textAlign:'center' }}>
+                  Reset link sent — check your inbox.
                 </div>
               )}
             </div>

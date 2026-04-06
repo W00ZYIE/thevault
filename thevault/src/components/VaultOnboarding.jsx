@@ -1,33 +1,58 @@
 // ─── VaultOnboarding.jsx ──────────────────────────────────────────────────────
-// Drop into: src/components/VaultOnboarding.jsx
 // Triggered when: loaded === true && baseLiq === 0 && txs.length === 0
 // Calls onComplete({ baseLiquidity, firstTx }) to hand control back to App.jsx
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
-const T = {
-  bg:      "#090b0e",
-  bgDeep:  "#060709",
-  surface: "#0c0f13",
-  border:  "rgba(107,155,192,0.08)",
-  borderHi:"rgba(107,155,192,0.22)",
-  text1:   "#edf2f6",
-  text2:   "#b8c8d8",
-  text3:   "#6e8099",
-  textMid: "#c8d8e8",
-  steel:   "rgba(107,155,192,0.55)",
-  steelLo: "rgba(107,155,192,0.25)",
-  steelDim:"rgba(107,155,192,0.08)",
-  green:   "#46e7a9",
-  red:     "#ff7f9f",
-  gold:    "#e2c983",
+const LIGHT_T = {
+  bg:      "#F8FAFC",
+  surface: "#FFFFFF",
+  border:  "rgba(0,0,0,0.07)",
+  borderMid:"rgba(0,0,0,0.12)",
+  text1:   "#0D1117",
+  text2:   "#374151",
+  text3:   "#6B7280",
+  text4:   "#9CA3AF",
+  inputBg: "#F1F4F9",
+  green:   "#059669",
+  red:     "#DC2626",
+  gold:    "#B8891A",
+  blue:    "#1B4FCC",
+  blueDark:"#1340A8",
+  blueLight:"#F0F4FF",
+  panelShadow: "0 8px 32px rgba(0,0,0,0.10)",
+  summaryBg:   "#F8FAFC",
+  summaryBorder:"rgba(0,0,0,0.07)",
+  summaryRowDivider:"rgba(0,0,0,0.05)",
+};
+
+const DARK_T = {
+  bg:      "#080C14",
+  surface: "#111827",
+  border:  "rgba(255,255,255,0.07)",
+  borderMid:"rgba(255,255,255,0.12)",
+  text1:   "#E5EAF3",
+  text2:   "#9CA3AF",
+  text3:   "#6B7280",
+  text4:   "#4B5563",
+  inputBg: "#0F1520",
+  green:   "#059669",
+  red:     "#DC2626",
+  gold:    "#B8891A",
+  blue:    "#3B6FE8",
+  blueDark:"#2E5CC7",
+  blueLight:"rgba(59,111,232,0.10)",
+  panelShadow: "0 8px 40px rgba(0,0,0,0.50)",
+  summaryBg:   "#0F1520",
+  summaryBorder:"rgba(255,255,255,0.06)",
+  summaryRowDivider:"rgba(255,255,255,0.04)",
 };
 
 const STEPS = [
-  { id: "capital",     code: "INIT-01", label: "Capital Position" },
-  { id: "firsttx",    code: "INIT-02", label: "First Entry"       },
-  { id: "ready",       code: "INIT-03", label: "Vault Armed"       },
+  { id: "capital", label: "Capital Position" },
+  { id: "firsttx", label: "First Entry"       },
+  { id: "ready",   label: "Review"            },
 ];
 
 const EXPENSE_CATS = [
@@ -39,247 +64,234 @@ const INCOME_CATS = [
   "Dividends","Capital Gains","Partnership Distribution","Other Income",
 ];
 
-// ── Inline CSS ────────────────────────────────────────────────────────────────
-const CSS = `
+function buildCSS(t) {
+  return `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @keyframes ob-fadein {
-  from { opacity:0; transform:translateY(16px); }
+  from { opacity:0; transform:translateY(12px); }
   to   { opacity:1; transform:translateY(0);    }
-}
-@keyframes ob-scan {
-  0%   { left:-40%; }
-  100% { left:140%; }
-}
-@keyframes ob-pulse {
-  0%,100% { opacity:0.35; }
-  50%      { opacity:1;    }
 }
 .ob-scene {
   position:fixed; inset:0; z-index:999;
-  background:#060709;
+  background:rgba(11,22,41,0.70);
   display:flex; align-items:center; justify-content:center;
-  font-family:'JetBrains Mono',monospace;
-}
-.ob-grid {
-  position:absolute; inset:0; pointer-events:none;
-  background-image:
-    linear-gradient(rgba(107,155,192,0.025) 1px, transparent 1px),
-    linear-gradient(90deg,rgba(107,155,192,0.025) 1px, transparent 1px);
-  background-size:48px 48px;
-}
-.ob-vignette {
-  position:absolute; inset:0; pointer-events:none;
-  background:radial-gradient(ellipse 70% 80% at 50% 50%, transparent 20%, rgba(0,0,0,0.96) 100%);
-}
-.ob-frame {
-  position:absolute; inset:16px; pointer-events:none;
-  border:1px solid rgba(107,155,192,0.08);
-}
-.ob-frame-inner {
-  position:absolute; inset:24px; pointer-events:none;
-  border:1px solid rgba(107,155,192,0.04);
-}
-.ob-corner {
-  position:absolute; width:20px; height:20px;
-  border-color:rgba(107,155,192,0.28); border-style:solid;
-}
-.ob-corner.tl { top:16px;    left:16px;  border-width:1px 0 0 1px; }
-.ob-corner.tr { top:16px;    right:16px; border-width:1px 1px 0 0; }
-.ob-corner.bl { bottom:16px; left:16px;  border-width:0 0 1px 1px; }
-.ob-corner.br { bottom:16px; right:16px; border-width:0 1px 1px 0; }
-.ob-scanline {
-  position:absolute; left:16px; right:16px; height:1px;
-  background:linear-gradient(to right, transparent, rgba(107,155,192,0.12), transparent);
-  animation:none; top:0;
+  font-family:'Inter',sans-serif;
 }
 .ob-center {
   position:relative; z-index:10;
-  width:100%; max-width:500px;
+  width:100%; max-width:480px;
   padding:0 24px;
-  animation:ob-fadein 0.6s cubic-bezier(0.16,1,0.3,1) forwards;
+  animation:ob-fadein 0.4s cubic-bezier(0.16,1,0.3,1) forwards;
 }
 .ob-wordmark {
-  text-align:center; margin-bottom:36px;
+  text-align:center; margin-bottom:20px;
 }
 .ob-wordmark-title {
-  font-family:'Cinzel',serif;
-  font-size:11px; font-weight:500;
-  letter-spacing:0.45em; color:rgba(107,155,192,0.45);
-  margin-bottom:6px;
+  font-family:'Inter',sans-serif;
+  font-size:18px; font-weight:600;
+  letter-spacing:0.06em; color:#FFFFFF;
+  margin-bottom:3px;
 }
 .ob-wordmark-sub {
-  font-size:7px; letter-spacing:0.28em;
-  color:rgba(107,155,192,0.22);
+  font-size:12px; font-weight:400; letter-spacing:0.01em;
+  color:rgba(255,255,255,0.40);
 }
 .ob-stepper {
-  display:flex; align-items:center; gap:0;
-  margin-bottom:28px;
+  display:flex; align-items:center;
+  margin-bottom:18px;
+  padding:0 4px;
 }
-.ob-step {
-  display:flex; align-items:center; gap:8px; flex:1;
+.ob-step-item {
+  display:flex; align-items:center; gap:8px;
 }
-.ob-step-dot {
-  width:6px; height:6px; border-radius:50%;
-  border:1px solid rgba(107,155,192,0.25);
-  flex-shrink:0; transition:all 0.3s;
+.ob-step-circle {
+  width:22px; height:22px; border-radius:50%;
+  border:1.5px solid rgba(255,255,255,0.20);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px; font-weight:500;
+  color:rgba(255,255,255,0.35);
+  flex-shrink:0; transition:all 200ms;
+  background:transparent;
 }
-.ob-step-dot.active  { background:rgba(107,155,192,0.8); border-color:rgba(107,155,192,0.8); }
-.ob-step-dot.done    { background:rgba(70,231,169,0.6);  border-color:rgba(70,231,169,0.6);  }
-.ob-step-dot.pending { background:transparent; }
+.ob-step-circle.active {
+  border-color:#1B4FCC;
+  color:#FFFFFF;
+  background:rgba(27,79,204,0.20);
+}
+.ob-step-circle.done {
+  border-color:#059669;
+  color:#059669;
+  background:rgba(5,150,105,0.10);
+}
 .ob-step-label {
-  font-size:7px; letter-spacing:0.22em; text-transform:uppercase;
-  color:rgba(107,155,192,0.28); transition:color 0.3s;
+  font-family:'Inter',sans-serif;
+  font-size:11px; font-weight:500; letter-spacing:0.02em;
+  color:rgba(255,255,255,0.25); transition:color 200ms;
+  white-space:nowrap;
 }
-.ob-step-label.active  { color:rgba(107,155,192,0.65); }
-.ob-step-label.done    { color:rgba(70,231,169,0.5);   }
-.ob-step-connector {
+.ob-step-label.active { color:rgba(255,255,255,0.80); }
+.ob-step-label.done   { color:rgba(255,255,255,0.45); }
+.ob-step-line {
   flex:1; height:1px;
-  background:rgba(107,155,192,0.08);
-  margin:0 8px;
+  background:rgba(255,255,255,0.10);
+  margin:0 10px;
 }
+.ob-step-line.done { background:rgba(5,150,105,0.35); }
 .ob-panel {
-  background:rgba(8,10,12,0.98);
-  border:1px solid rgba(107,155,192,0.12);
-  border-top:1px solid rgba(107,155,192,0.25);
+  background:${t.surface};
+  border:1px solid ${t.border};
+  border-radius:12px;
+  box-shadow:${t.panelShadow};
   padding:28px 28px 24px;
-  position:relative; overflow:hidden;
+  position:relative;
 }
-.ob-panel::before {
-  content:'';
-  position:absolute; top:0; left:0; right:0; height:1px;
-  background:linear-gradient(90deg, transparent, rgba(107,155,192,0.3), transparent);
-}
-.ob-panel-code {
-  font-size:7px; letter-spacing:0.28em;
-  color:rgba(107,155,192,0.28); margin-bottom:6px;
+.ob-step-counter {
+  font-family:'Inter',sans-serif;
+  font-size:10px; font-weight:600; letter-spacing:0.10em; text-transform:uppercase;
+  color:${t.text4}; margin-bottom:6px;
 }
 .ob-panel-title {
-  font-family:'Cinzel',serif;
-  font-size:17px; font-weight:500;
-  letter-spacing:0.08em; color:#D4E0EA;
-  margin-bottom:6px;
+  font-family:'Inter',sans-serif;
+  font-size:20px; font-weight:600;
+  color:${t.text1};
+  margin-bottom:6px; letter-spacing:-0.01em;
 }
 .ob-panel-desc {
-  font-size:10px; line-height:1.8;
-  color:rgba(107,155,192,0.45);
-  letter-spacing:0.04em; margin-bottom:24px;
+  font-family:'Inter',sans-serif;
+  font-size:13px; font-weight:400; line-height:1.6;
+  color:${t.text3};
+  margin-bottom:24px;
 }
-.ob-field { margin-bottom:18px; }
+.ob-field { margin-bottom:16px; }
 .ob-field-label {
-  font-size:7px; letter-spacing:0.25em; text-transform:uppercase;
-  color:rgba(107,155,192,0.4); margin-bottom:8px; display:block;
+  font-family:'Inter',sans-serif;
+  font-size:12px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase;
+  color:${t.text3}; margin-bottom:6px; display:block;
 }
 .ob-input {
   width:100%;
-  background:rgba(107,155,192,0.04);
-  border:1px solid rgba(107,155,192,0.12);
-  padding:12px 14px;
-  color:#edf2f6; font-family:'JetBrains Mono',monospace;
+  background:${t.inputBg};
+  border:1px solid ${t.border};
+  border-radius:6px;
+  padding:10px 12px;
+  color:${t.text1}; font-family:'JetBrains Mono',monospace;
   font-size:13px; letter-spacing:0.02em;
-  transition:border-color 150ms;
+  transition:border-color 200ms, box-shadow 200ms;
+  outline:none;
+  box-sizing:border-box;
 }
-.ob-input:focus { border-color:rgba(107,155,192,0.35); }
+.ob-input:focus {
+  border-color:${t.blue};
+  box-shadow:0 0 0 3px ${t.blueLight};
+}
 .ob-input-amount {
-  font-size:32px; font-weight:400;
-  letter-spacing:-0.04em; text-align:center;
+  font-size:32px; font-weight:500;
+  letter-spacing:-0.03em; text-align:center;
   padding:18px 14px 14px;
   caret-color:transparent;
+  background:${t.inputBg};
+  border:1px solid ${t.border};
 }
 .ob-input-hint {
-  font-size:7px; letter-spacing:0.16em;
-  color:rgba(107,155,192,0.22); margin-top:6px;
+  font-family:'Inter',sans-serif;
+  font-size:11px; font-weight:400;
+  color:${t.text4}; margin-top:6px;
   text-align:center;
 }
 .ob-select {
   width:100%;
-  background:rgba(107,155,192,0.04);
-  border:1px solid rgba(107,155,192,0.12);
-  padding:12px 14px;
-  color:#edf2f6; font-family:'JetBrains Mono',monospace;
-  font-size:12px; letter-spacing:0.02em;
-  transition:border-color 150ms; cursor:pointer;
-  appearance:none;
+  background:${t.inputBg};
+  border:1px solid ${t.border};
+  border-radius:6px;
+  padding:10px 12px;
+  color:${t.text1}; font-family:'Inter',sans-serif;
+  font-size:13px; font-weight:400;
+  transition:border-color 200ms; cursor:pointer;
+  appearance:none; outline:none;
+  box-sizing:border-box;
 }
-.ob-select:focus { border-color:rgba(107,155,192,0.35); }
+.ob-select:focus {
+  border-color:${t.blue};
+  box-shadow:0 0 0 3px ${t.blueLight};
+}
+.ob-select option { background:${t.surface}; color:${t.text1}; }
 .ob-type-toggle {
-  display:flex; gap:0; margin-bottom:18px;
-  border:1px solid rgba(107,155,192,0.12);
+  display:flex; gap:0; margin-bottom:16px;
+  border:1px solid ${t.borderMid};
+  border-radius:6px; overflow:hidden;
+  background:${t.inputBg};
+  padding:3px; gap:3px;
 }
 .ob-type-btn {
-  flex:1; padding:10px;
-  background:transparent; border:none;
-  font-family:'JetBrains Mono',monospace;
-  font-size:8px; letter-spacing:0.22em; text-transform:uppercase;
-  color:rgba(107,155,192,0.35); transition:all 150ms;
+  flex:1; padding:8px 10px;
+  background:transparent; border:none; border-radius:4px;
+  font-family:'Inter',sans-serif;
+  font-size:12px; font-weight:600; letter-spacing:0.02em;
+  color:${t.text3}; transition:all 200ms; cursor:pointer;
 }
-.ob-type-btn.active-income  { background:rgba(70,231,169,0.08);  color:#46e7a9; }
-.ob-type-btn.active-expense { background:rgba(255,127,159,0.08); color:#ff7f9f; }
+.ob-type-btn.active-income  { background:${t.surface}; color:${t.green}; }
+.ob-type-btn.active-expense { background:${t.surface}; color:${t.red}; }
 .ob-actions {
-  display:flex; gap:10px; margin-top:24px;
+  display:flex; gap:8px; margin-top:22px;
 }
 .ob-btn-primary {
-  flex:1; padding:13px;
-  background:rgba(107,155,192,0.10);
-  border:1px solid rgba(107,155,192,0.30);
-  color:#C2D0DC; font-family:'JetBrains Mono',monospace;
-  font-size:8px; font-weight:400;
-  letter-spacing:0.25em; text-transform:uppercase;
-  transition:all 200ms; position:relative; overflow:hidden;
+  flex:1; padding:12px 20px;
+  background:${t.blue};
+  border:none;
+  border-radius:6px;
+  color:#FFFFFF; font-family:'Inter',sans-serif;
+  font-size:14px; font-weight:600;
+  transition:background 200ms; cursor:pointer;
 }
-.ob-btn-primary:hover {
-  background:rgba(107,155,192,0.18);
-  border-color:rgba(107,155,192,0.5);
-  color:#E4EBF0;
-}
-.ob-btn-primary:disabled {
-  opacity:0.3; cursor:not-allowed;
-}
+.ob-btn-primary:hover { background:${t.blueDark}; }
+.ob-btn-primary:disabled { opacity:0.35; cursor:not-allowed; }
 .ob-btn-ghost {
-  padding:13px 18px;
+  padding:12px 16px;
   background:transparent;
-  border:1px solid rgba(107,155,192,0.08);
-  color:rgba(107,155,192,0.3); font-family:'JetBrains Mono',monospace;
-  font-size:8px; letter-spacing:0.18em; text-transform:uppercase;
-  transition:all 150ms;
+  border:none;
+  color:${t.text3}; font-family:'Inter',sans-serif;
+  font-size:13px; font-weight:500;
+  transition:color 200ms; cursor:pointer;
 }
-.ob-btn-ghost:hover { color:rgba(107,155,192,0.6); border-color:rgba(107,155,192,0.18); }
-.ob-ready-check {
-  width:52px; height:52px; border-radius:50%;
-  border:1px solid rgba(70,231,169,0.3);
+.ob-btn-ghost:hover { color:${t.text2}; }
+.ob-ready-icon {
+  width:44px; height:44px; border-radius:50%;
+  border:1.5px solid rgba(5,150,105,0.25);
   display:flex; align-items:center; justify-content:center;
-  margin:0 auto 20px;
-  background:rgba(70,231,169,0.05);
-}
-.ob-ready-check svg {
-  width:22px; height:22px;
-  stroke:#46e7a9; stroke-width:1.5;
-  fill:none; stroke-linecap:round; stroke-linejoin:round;
+  margin:0 auto 18px;
 }
 .ob-summary {
-  background:rgba(107,155,192,0.03);
-  border:1px solid rgba(107,155,192,0.08);
-  padding:16px;
-  margin-bottom:20px;
+  background:${t.summaryBg};
+  border:1px solid ${t.summaryBorder};
+  border-radius:8px;
+  padding:14px 16px;
+  margin-bottom:18px;
 }
 .ob-summary-row {
   display:flex; justify-content:space-between; align-items:baseline;
-  padding:5px 0;
-  border-bottom:1px solid rgba(107,155,192,0.05);
+  padding:7px 0;
+  border-bottom:1px solid ${t.summaryRowDivider};
 }
 .ob-summary-row:last-child { border-bottom:none; }
 .ob-summary-key {
-  font-size:7.5px; letter-spacing:0.18em;
-  color:rgba(107,155,192,0.38);
+  font-family:'Inter',sans-serif;
+  font-size:12px; font-weight:500;
+  color:${t.text3};
 }
 .ob-summary-val {
-  font-size:11px; font-weight:500;
-  color:#C2D0DC; letter-spacing:-0.01em;
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px; font-weight:500;
+  color:${t.text1}; letter-spacing:-0.01em;
 }
 `;
+}
 
 function fmt(n) {
   return new Intl.NumberFormat("en-US", {
-    style:"currency", currency:"USD",
-    minimumFractionDigits:2, maximumFractionDigits:2,
+    style: "currency", currency: "USD",
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format(typeof n === "number" && Number.isFinite(n) ? n : 0);
 }
 
@@ -289,7 +301,7 @@ function parseAmount(digits) {
 }
 
 // ── Step 1: Capital Position ──────────────────────────────────────────────────
-function StepCapital({ onNext }) {
+function StepCapital({ onNext, t }) {
   const [digits, setDigits] = useState("");
   const amount = parseAmount(digits);
   const valid  = amount > 0;
@@ -308,14 +320,12 @@ function StepCapital({ onNext }) {
 
   return (
     <>
-      <div className="ob-panel-code">INIT-01 · CAPITAL POSITION</div>
+      <div className="ob-step-counter">Step 1 of 3</div>
       <div className="ob-panel-title">Set Your Base Capital</div>
       <div className="ob-panel-desc">
-        This is your current liquid cash on hand — the starting point Vault
-        uses to calculate your runway, net position, and available capital.
-        Enter what you have available right now.
+        Your current liquid cash on hand — the starting point for calculating
+        runway, net position, and available capital. Enter what you have right now.
       </div>
-
       <div className="ob-field">
         <input
           autoFocus
@@ -323,22 +333,13 @@ function StepCapital({ onNext }) {
           className="ob-input ob-input-amount"
           value={digits.length === 0 ? "$0.00" : fmt(amount)}
           onKeyDown={handleKey}
-          style={{
-            color: amount === 0
-              ? "rgba(107,155,192,0.22)"
-              : "rgba(220,235,250,0.92)",
-          }}
+          style={{ color: amount === 0 ? t.text4 : t.text1 }}
         />
         <div className="ob-input-hint">Type digits · Backspace to clear · Enter to continue</div>
       </div>
-
       <div className="ob-actions">
-        <button
-          className="ob-btn-primary"
-          disabled={!valid}
-          onClick={() => onNext(amount)}
-        >
-          Establish Position →
+        <button className="ob-btn-primary" disabled={!valid} onClick={() => onNext(amount)}>
+          Continue
         </button>
       </div>
     </>
@@ -346,21 +347,20 @@ function StepCapital({ onNext }) {
 }
 
 // ── Step 2: First Transaction ─────────────────────────────────────────────────
-function StepFirstTx({ onNext, onSkip }) {
-  const [type,    setType]    = useState("expense");
-  const [digits,  setDigits]  = useState("");
-  const [cat,     setCat]     = useState("Operations");
-  const [desc,    setDesc]    = useState("");
-  const [date,    setDate]    = useState(new Date().toISOString().split("T")[0]);
+function StepFirstTx({ onNext, onSkip, t }) {
+  const [type,   setType]   = useState("expense");
+  const [digits, setDigits] = useState("");
+  const [cat,    setCat]    = useState("Operations");
+  const [desc,   setDesc]   = useState("");
+  const [date,   setDate]   = useState(new Date().toISOString().split("T")[0]);
 
   const amount = parseAmount(digits);
   const valid  = amount > 0;
   const cats   = type === "expense" ? EXPENSE_CATS : INCOME_CATS;
 
-  // Reset category when type switches
-  const switchType = t => {
-    setType(t);
-    setCat(t === "expense" ? EXPENSE_CATS[0] : INCOME_CATS[0]);
+  const switchType = newType => {
+    setType(newType);
+    setCat(newType === "expense" ? EXPENSE_CATS[0] : INCOME_CATS[0]);
   };
 
   const handleKey = e => {
@@ -371,98 +371,57 @@ function StepFirstTx({ onNext, onSkip }) {
       e.preventDefault();
       setDigits(d => d.slice(0, -1));
     } else if (e.key === "Enter" && valid) {
-      onNext({ type, amount, category:cat, description:desc, date,
-               tags:"", recurring:false, recurringFreq:"monthly" });
+      onNext({ type, amount, category: cat, description: desc, date, tags: "", recurring: false, recurringFreq: "monthly" });
     }
   };
 
   return (
     <>
-      <div className="ob-panel-code">INIT-02 · FIRST ENTRY</div>
+      <div className="ob-step-counter">Step 2 of 3</div>
       <div className="ob-panel-title">Record Your First Entry</div>
       <div className="ob-panel-desc">
-        Log a recent transaction to activate your ledger.
-        This can be anything — a bill paid, revenue received, or a regular expense.
+        Log a recent transaction to activate your ledger — a bill paid, revenue received, or a regular expense.
       </div>
-
       <div className="ob-type-toggle">
-        {["expense","income"].map(t => (
-          <button
-            key={t}
-            className={`ob-type-btn${type === t ? ` active-${t}` : ""}`}
-            onClick={() => switchType(t)}
-          >
-            {t === "expense" ? "Burn" : "Income"}
+        {["expense","income"].map(tp => (
+          <button key={tp} className={`ob-type-btn${type === tp ? ` active-${tp}` : ""}`} onClick={() => switchType(tp)}>
+            {tp === "expense" ? "Expense" : "Income"}
           </button>
         ))}
       </div>
-
       <div className="ob-field">
         <label className="ob-field-label">Amount</label>
         <input
-          autoFocus
-          readOnly
+          autoFocus readOnly
           className="ob-input ob-input-amount"
           value={digits.length === 0 ? "$0.00" : fmt(amount)}
           onKeyDown={handleKey}
-          style={{
-            fontSize: 26,
-            color: amount === 0
-              ? "rgba(107,155,192,0.22)"
-              : type === "income"
-                ? "#46e7a9"
-                : "#ff7f9f",
-          }}
+          style={{ fontSize: 26, color: amount === 0 ? t.text4 : type === "income" ? t.green : t.red }}
         />
       </div>
-
       <div className="ob-field">
         <label className="ob-field-label">Category</label>
-        <select
-          className="ob-select"
-          value={cat}
-          onChange={e => setCat(e.target.value)}
-        >
+        <select className="ob-select" value={cat} onChange={e => setCat(e.target.value)}>
           {cats.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
-
-      <div style={{ display:"flex", gap:10 }}>
-        <div className="ob-field" style={{ flex:1 }}>
-          <label className="ob-field-label">Description (optional)</label>
-          <input
-            className="ob-input"
-            placeholder="Memo…"
-            value={desc}
-            onChange={e => setDesc(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && valid &&
-              onNext({ type, amount, category:cat, description:desc, date,
-                       tags:"", recurring:false, recurringFreq:"monthly" })}
-          />
+      <div style={{ display: "flex", gap: 10 }}>
+        <div className="ob-field" style={{ flex: 1 }}>
+          <label className="ob-field-label">Description</label>
+          <input className="ob-input" placeholder="Memo (optional)" value={desc} onChange={e => setDesc(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && valid && onNext({ type, amount, category: cat, description: desc, date, tags: "", recurring: false, recurringFreq: "monthly" })} />
         </div>
-        <div className="ob-field" style={{ flex:1 }}>
+        <div className="ob-field" style={{ flex: 1 }}>
           <label className="ob-field-label">Date</label>
-          <input
-            type="date"
-            className="ob-input"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            style={{ colorScheme:"dark" }}
-          />
+          <input type="date" className="ob-input" value={date} onChange={e => setDate(e.target.value)}
+            style={{ colorScheme: "light dark" }} />
         </div>
       </div>
-
       <div className="ob-actions">
-        <button className="ob-btn-ghost" onClick={onSkip}>
-          Skip
-        </button>
-        <button
-          className="ob-btn-primary"
-          disabled={!valid}
-          onClick={() => onNext({ type, amount, category:cat, description:desc,
-                                  date, tags:"", recurring:false, recurringFreq:"monthly" })}
-        >
-          Record Entry →
+        <button className="ob-btn-ghost" onClick={onSkip}>Skip</button>
+        <button className="ob-btn-primary" disabled={!valid}
+          onClick={() => onNext({ type, amount, category: cat, description: desc, date, tags: "", recurring: false, recurringFreq: "monthly" })}>
+          Continue
         </button>
       </div>
     </>
@@ -470,33 +429,29 @@ function StepFirstTx({ onNext, onSkip }) {
 }
 
 // ── Step 3: Ready ─────────────────────────────────────────────────────────────
-function StepReady({ baseLiq, firstTx, onEnter }) {
+function StepReady({ baseLiq, firstTx, onEnter, t }) {
   return (
     <>
-      <div className="ob-panel-code">INIT-03 · VAULT ARMED</div>
-      <div className="ob-ready-check">
-        <svg viewBox="0 0 24 24">
+      <div className="ob-step-counter">Step 3 of 3</div>
+      <div className="ob-ready-icon">
+        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
-      <div className="ob-panel-title" style={{ textAlign:"center", marginBottom:8 }}>
-        Vault Is Ready
+      <div className="ob-panel-title" style={{ textAlign: "center", marginBottom: 6 }}>You're all set.</div>
+      <div className="ob-panel-desc" style={{ textAlign: "center", marginBottom: 18 }}>
+        Your capital position is established. Review your entries below before entering the dashboard.
       </div>
-      <div className="ob-panel-desc" style={{ textAlign:"center", marginBottom:20 }}>
-        Your capital position has been established. Your command center is armed.
-      </div>
-
       <div className="ob-summary">
         <div className="ob-summary-row">
           <span className="ob-summary-key">Base Capital</span>
-          <span className="ob-summary-val" style={{ color:"#46e7a9" }}>{fmt(baseLiq)}</span>
+          <span className="ob-summary-val" style={{ color: t.green }}>{fmt(baseLiq)}</span>
         </div>
         {firstTx && (
           <>
             <div className="ob-summary-row">
               <span className="ob-summary-key">First Entry</span>
-              <span className="ob-summary-val"
-                style={{ color: firstTx.type === "income" ? "#46e7a9" : "#ff7f9f" }}>
+              <span className="ob-summary-val" style={{ color: firstTx.type === "income" ? t.green : t.red }}>
                 {firstTx.type === "income" ? "+" : "−"}{fmt(firstTx.amount)}
               </span>
             </div>
@@ -509,33 +464,38 @@ function StepReady({ baseLiq, firstTx, onEnter }) {
         <div className="ob-summary-row">
           <span className="ob-summary-key">Net Position</span>
           <span className="ob-summary-val">
-            {fmt(baseLiq + (firstTx
-              ? (firstTx.type === "income" ? firstTx.amount : -firstTx.amount)
-              : 0))}
+            {fmt(baseLiq + (firstTx ? (firstTx.type === "income" ? firstTx.amount : -firstTx.amount) : 0))}
           </span>
         </div>
       </div>
-
       <div className="ob-actions">
-        <button className="ob-btn-primary" onClick={onEnter}>
-          Enter Vault →
-        </button>
+        <button className="ob-btn-primary" onClick={onEnter}>Open Dashboard</button>
       </div>
     </>
   );
 }
 
-// ── Stepper Header ────────────────────────────────────────────────────────────
+// ── Stepper ───────────────────────────────────────────────────────────────────
 function Stepper({ current }) {
   return (
     <div className="ob-stepper">
       {STEPS.map((s, i) => {
         const state = i < current ? "done" : i === current ? "active" : "pending";
         return (
-          <div key={s.id} className="ob-step" style={{ flex: i < STEPS.length - 1 ? 1 : "none" }}>
-            <div className={`ob-step-dot ${state}`} />
-            <span className={`ob-step-label ${state}`}>{s.label}</span>
-            {i < STEPS.length - 1 && <div className="ob-step-connector" />}
+          <div key={s.id} style={{ display: "flex", alignItems: "center", flex: i < STEPS.length - 1 ? 1 : "none" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <div className={`ob-step-circle ${state}`}>
+                {state === "done" ? (
+                  <svg width={10} height={10} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="8 2.5 4 7.5 2 5.5" />
+                  </svg>
+                ) : (
+                  <span>{i + 1}</span>
+                )}
+              </div>
+              <span className={`ob-step-label ${state}`}>{s.label}</span>
+            </div>
+            {i < STEPS.length - 1 && <div className={`ob-step-line ${state === "done" ? "done" : ""}`} />}
           </div>
         );
       })}
@@ -544,55 +504,45 @@ function Stepper({ current }) {
 }
 
 // ── Main Export ───────────────────────────────────────────────────────────────
-export default function VaultOnboarding({ onComplete }) {
+export default function VaultOnboarding({ onComplete, theme, initialCapital }) {
   const [step,    setStep]    = useState(0);
-  const [baseLiq, setBaseLiq] = useState(0);
+  const [baseLiq, setBaseLiq] = useState(initialCapital || 0);
   const [firstTx, setFirstTx] = useState(null);
 
-  const handleCapital = amount => {
-    setBaseLiq(amount);
-    setStep(1);
-  };
+  const t = theme === 'dark' ? DARK_T : LIGHT_T;
+  const css = buildCSS(t);
 
-  const handleFirstTx = tx => {
-    setFirstTx(tx);
-    setStep(2);
-  };
-
-  const handleSkip = () => {
-    setFirstTx(null);
-    setStep(2);
-  };
-
-  const handleEnter = () => {
-    onComplete({ baseLiquidity: baseLiq, firstTx });
-  };
+  const handleCapital = amount => { setBaseLiq(amount); setStep(1); };
+  const handleFirstTx = tx => { setFirstTx(tx); setStep(2); };
+  const handleSkip    = () => { setFirstTx(null); setStep(2); };
+  const handleEnter   = () => { onComplete({ baseLiquidity: baseLiq, firstTx }); };
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="ob-scene">
-        <div className="ob-grid" />
-        <div className="ob-vignette" />
-        <div className="ob-frame" />
-        <div className="ob-frame-inner" />
-        <div className="ob-corner tl" />
-        <div className="ob-corner tr" />
-        <div className="ob-corner bl" />
-        <div className="ob-corner br" />
-
-        <div className="ob-center">
+        <div className="ob-center" style={{ position:'relative' }}>
+          <button
+            onClick={() => onComplete({ baseLiquidity: 0, firstTx: null })}
+            style={{
+              position:'absolute', top:0, right:0,
+              background:'none', border:'none', cursor:'pointer',
+              fontFamily:"'Inter',sans-serif", fontSize:12,
+              color: theme === 'dark' ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)',
+              letterSpacing:'0.02em', padding:'4px 0',
+            }}
+          >
+            Skip setup →
+          </button>
           <div className="ob-wordmark">
-            <div className="ob-wordmark-title">VAULT</div>
-            <div className="ob-wordmark-sub">Initial Configuration · Sequence {STEPS[step].code}</div>
+            <div className="ob-wordmark-title">VAULT<span style={{ color: '#3B7FFF' }}>IQ</span></div>
+            <div className="ob-wordmark-sub">Initial Setup</div>
           </div>
-
           <Stepper current={step} />
-
           <div className="ob-panel">
-            {step === 0 && <StepCapital  onNext={handleCapital}  />}
-            {step === 1 && <StepFirstTx  onNext={handleFirstTx} onSkip={handleSkip} />}
-            {step === 2 && <StepReady    baseLiq={baseLiq} firstTx={firstTx} onEnter={handleEnter} />}
+            {step === 0 && <StepCapital onNext={handleCapital} t={t} />}
+            {step === 1 && <StepFirstTx onNext={handleFirstTx} onSkip={handleSkip} t={t} />}
+            {step === 2 && <StepReady baseLiq={baseLiq} firstTx={firstTx} onEnter={handleEnter} t={t} />}
           </div>
         </div>
       </div>

@@ -35,7 +35,8 @@ export function useTrialState(accountEmail, session) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("payment") === "success") {
+    const payment = params.get("payment");
+    if (payment === "success" || payment === "cancelled") {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);

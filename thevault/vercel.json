@@ -2,6 +2,16 @@
   "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist",
   "installCommand": "echo skip",
+  "headers": [
+    {
+      "source": "/",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    },
+    {
+      "source": "/index.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    }
+  ],
   "routes": [
     { "src": "/api/checkout", "dest": "/api/checkout.js" },
     { "src": "/api/stripe-webhook", "dest": "/api/stripe-webhook.js" },

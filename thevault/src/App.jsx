@@ -342,9 +342,14 @@ const formFromTx = tx => ({
 // ─── Toast hook ────────────────────────────────────────────────────────────────
 let _toastId = 0;
 function useToast() {
-  // Notifications removed — all addToast calls are silently swallowed
-  const noop = useCallback(() => {}, []);
-  return { toasts: [], add: noop, remove: noop };
+  const [toasts, setToasts] = useState([]);
+  const add = useCallback((text, type = 'ok') => {
+    const id = ++_toastId;
+    setToasts(prev => [...prev, { id, text, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4500);
+  }, []);
+  const remove = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), []);
+  return { toasts, add, remove };
 }
 
 // ─── Intelligence System ───────────────────────────────────────────────────────
@@ -840,7 +845,26 @@ function getPriorityActions({ monthIncome, monthExpenses, savingsRate, runwayDay
 }
 
 // ─── Toast Stack ───────────────────────────────────────────────────────────────
-function ToastStack() { return null; }
+function ToastStack({ toasts = [], remove }) {
+  if (!toasts.length) return null;
+  const colors = { err: '#DC2626', warn: '#B8891A', info: '#3A3A3A', ok: '#1B4FCC' };
+  return (
+    <div style={{ position:'fixed', bottom:24, right:24, zIndex:9999, display:'flex', flexDirection:'column', gap:8, pointerEvents:'none' }}>
+      {toasts.map(t => (
+        <div key={t.id} onClick={() => remove(t.id)} style={{
+          padding:'10px 16px', background: colors[t.type] || colors.ok,
+          color:'#fff', borderRadius:8, fontSize:13, lineHeight:1.4,
+          fontFamily:"'Inter',sans-serif", cursor:'pointer',
+          boxShadow:'0 4px 16px rgba(0,0,0,0.18)', maxWidth:320, pointerEvents:'all',
+          animation:'toastIn 0.2s ease',
+        }}>
+          {t.text}
+        </div>
+      ))}
+      <style>{`@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
+    </div>
+  );
+}
 
 // ─── Animated Number Hook (Phase 2) ──────────────────────────────────────────
 function useAnimatedNumber(value, duration = 600) {
@@ -1291,7 +1315,23 @@ export default function Vault() {
   const { toasts, add:addToast, remove:removeToast } = useToast();
   const { fmt, fSign } = useMemo(() => makeFmt("USD"), []);
   const { tier, daysRemaining, trialExpired, isPaid, trialReady } = useTrialState(accountEmail, session);
-  
+
+  // ── Payment redirect handler ──────────────────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    const tierParam = params.get("tier");
+    if (payment === "success") {
+      const name = tierParam ? tierParam.charAt(0).toUpperCase() + tierParam.slice(1) : "Solo";
+      window.history.replaceState({}, "", window.location.pathname);
+      addToast(`Welcome to VaultIQ ${name}. Your access is now active.`, "ok");
+    } else if (payment === "cancelled") {
+      window.history.replaceState({}, "", window.location.pathname);
+      addToast("Payment cancelled — you're still on your free trial.", "info");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const {
     items: plaidItems,
     importedTxs,
@@ -1900,8 +1940,8 @@ export default function Vault() {
 
   const LoadingScreen = () => (
     <div style={{ position:"fixed",inset:0,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:18 }}>
-      <div style={{ fontFamily:"'Inter',sans-serif",fontSize:11,letterSpacing:"0.35em",color:T.text3 }}>GRAPE</div>
-      <div style={{ fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,letterSpacing:"0.3em",color:T.text4 }}>INITIALIZING SYSTEMS</div>
+      <div style={{ fontFamily:"'JetBrains Mono',monospace",fontSize:13,fontWeight:500,letterSpacing:"0.12em",color:T.text2 }}>VAULTIQ</div>
+      <div style={{ fontFamily:"'Inter',sans-serif",fontSize:10,letterSpacing:"0.10em",color:T.text4,marginTop:4 }}>LOADING</div>
       <div style={{ width:120,height:1,background:T.border,position:"relative",overflow:"hidden",marginTop:4 }}>
         <div style={{ position:"absolute",top:0,height:"100%",width:"40%",background:T.blue,animation:"scan 1.4s ease-in-out infinite" }} />
       </div>
