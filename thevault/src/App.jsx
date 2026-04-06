@@ -1920,21 +1920,19 @@ export default function Vault() {
             setAuthIntent('signup');
             setShowAuth(true);
           }}
-          onSelectTier={(tid) => { setAuthIntent(tid); setShowAuth(true); }}
+          onSelectTier={() => { setAuthIntent('signup'); setShowAuth(true); }}
         />
       );
     }
     return (
       <AuthView
-        onAuth={(newSession) => {
-          if (['solo', 'operator', 'studio'].includes(authIntent)) {
-            const email = encodeURIComponent(newSession?.user?.email || '');
-            window.location.href = `/api/checkout?tier=${authIntent}&email=${email}`;
-          }
+        onAuth={() => {
+          setShowAuth(false);
+          setAuthIntent(null);
         }}
         initialTab={authIntent === 'signin' ? 'signin' : 'signup'}
-        planHint={['solo','operator','studio'].includes(authIntent) ? authIntent : null}
-        calcContext={['solo','operator','studio'].includes(authIntent) ? null : calcContext}
+        planHint={null}
+        calcContext={calcContext}
         onBack={() => { setShowAuth(false); setCalcContext(null); }}
       />
     );
@@ -1967,10 +1965,10 @@ export default function Vault() {
       />
     );
   }
-    // ── Trial gate — disabled for free-first model (preserved for future activation) ──
-  // if (trialReady && trialExpired && !isPaid) {
-  //   return <TrialExpiredWall accountEmail={accountEmail} T={T} />;
-  // }
+    // ── Trial gate — activates after 14-day free trial ──
+  if (trialReady && trialExpired && !isPaid) {
+    return <TrialExpiredWall accountEmail={accountEmail} T={T} />;
+  }
    
 
   // ── Inline helper components (use T token, defined here for theme access) ──
@@ -2095,6 +2093,16 @@ export default function Vault() {
               </button>
             ))}
           </nav>
+
+          {/* Trial upgrade banner */}
+          {!sidebarCollapsed && !isPaid && (
+            <TrialBanner
+              daysRemaining={daysRemaining}
+              isPaid={isPaid}
+              accountEmail={accountEmail}
+              T={T}
+            />
+          )}
 
           {/* Bottom: financial summary + New + account */}
           <div className="v-sidebar-bottom">

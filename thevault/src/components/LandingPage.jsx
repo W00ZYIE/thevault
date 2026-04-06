@@ -294,9 +294,14 @@ function HeroSection({ onSignIn, onStartTrial }) {
               Vault automatically tracks every transaction, computes your runway, and surfaces what matters — without the manual work.
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-              <button className="lp2-btn lp2-btn-primary lp2-btn-lg" onClick={() => onStartTrial()}>
-                Get started
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+                <button className="lp2-btn lp2-btn-primary lp2-btn-lg" onClick={() => onStartTrial()}>
+                  Start Free Trial
+                </button>
+                <span style={{ fontFamily: LP.mono, fontSize: 10, color: LP.text4, letterSpacing: '0.08em' }}>
+                  No credit card required
+                </span>
+              </div>
               <button className="lp2-btn lp2-btn-ghost" onClick={onSignIn} style={{ color: LP.text3 }}>
                 Sign in →
               </button>
@@ -432,7 +437,7 @@ function IntelligenceStrip() {
 }
 
 // ── Pricing Section ───────────────────────────────────────────────────────────
-function PricingSection({ onStartTrial, onSelectTier }) {
+function PricingSection({ onStartTrial }) {
   return (
     <section className="lp2-section lp2-reveal" style={{ background: LP.bgSubtle }}>
       <div className="lp2-inner">
@@ -472,9 +477,9 @@ function PricingSection({ onStartTrial, onSelectTier }) {
               <button
                 className={`lp2-btn ${tier.featured ? 'lp2-btn-primary' : 'lp2-btn-outline'}`}
                 style={{ justifyContent: 'center', width: '100%' }}
-                onClick={() => onSelectTier ? onSelectTier(tier.id) : onStartTrial()}
+                onClick={() => onStartTrial()}
               >
-                Get started
+                Start free · Upgrade later
               </button>
             </div>
           ))}
@@ -602,7 +607,7 @@ export default function LandingPage({ onSignIn, onStartTrial, onSelectTier }) {
         <TrustStrip />
         <SystemBlocks />
         <IntelligenceStrip />
-        <PricingSection onStartTrial={onStartTrial} onSelectTier={onSelectTier} />
+        <PricingSection onStartTrial={onStartTrial} />
         <FinalCta onStartTrial={onStartTrial} />
       </main>
 

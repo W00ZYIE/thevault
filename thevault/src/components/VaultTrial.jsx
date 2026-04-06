@@ -190,7 +190,7 @@ export function TrialExpiredWall({ accountEmail, T }) {
 }
 
 // ─── TrialBanner ─────────────────────────────────────────────────────────────
-export function TrialBanner({ daysRemaining, isPaid, T }) {
+export function TrialBanner({ daysRemaining, isPaid, accountEmail, T }) {
   if (isPaid) return null;
 
   return (
@@ -236,9 +236,22 @@ export function TrialBanner({ daysRemaining, isPaid, T }) {
           transition: "width 600ms ease",
         }} />
       </div>
-      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.30)", letterSpacing: "0.01em" }}>
-        {daysRemaining <= 3 ? "Upgrade to keep access" : "Upgrade anytime"}
-      </div>
+      <button
+        onClick={() => {
+          const email = encodeURIComponent(accountEmail || "");
+          window.location.href = `/api/checkout?tier=solo&email=${email}`;
+        }}
+        style={{
+          marginTop: 2, width: "100%", padding: "6px 10px",
+          background: daysRemaining <= 3 ? "#DC2626" : "rgba(255,255,255,0.10)",
+          border: "1px solid rgba(255,255,255,0.12)", borderRadius: 5,
+          color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: 600,
+          fontFamily: "'Inter', sans-serif", letterSpacing: "0.03em",
+          cursor: "pointer", textAlign: "center",
+        }}
+      >
+        Upgrade to Solo · $25/mo
+      </button>
     </div>
   );
 }
