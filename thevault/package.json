@@ -15,7 +15,7 @@
     "react-dom": "^19.2.4",
     "react-plaid-link": "^4.1.1",
     "recharts": "^3.8.0",
-    "stripe": "^14.0.0"
+    "stripe": "^17.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -53,7 +53,10 @@ export default async function handler(req, res) {
     // Redirect the browser to Stripe Checkout
     return res.redirect(303, session.url);
   } catch (err) {
-    console.error("[checkout]", err.message);
-    return res.status(500).json({ error: err.message });
+    console.error("[checkout] error:", err.message);
+    console.error("[checkout] type:", err.type);
+    console.error("[checkout] code:", err.code);
+    console.error("[checkout] stack:", err.stack);
+    return res.status(500).json({ error: err.message, type: err.type, code: err.code });
   }
 }
