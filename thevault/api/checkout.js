@@ -15,9 +15,9 @@ import Stripe from "stripe";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const PRICE_IDS = {
-  solo:     process.env.STRIPE_PRICE_SOLO,
-  operator: process.env.STRIPE_PRICE_OPERATOR,
-  studio:   process.env.STRIPE_PRICE_STUDIO,
+  solo:     process.env.STRIPE_PRICE_SOLO?.trim(),
+  operator: process.env.STRIPE_PRICE_OPERATOR?.trim(),
+  studio:   process.env.STRIPE_PRICE_STUDIO?.trim(),
 };
 
 export default async function handler(req, res) {
